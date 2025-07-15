@@ -1,0 +1,476 @@
+---
+title: "Ánalisis de las encuestas de hodares con R"
+subtitle: "Cápitulos: Procesamiento longitudinal de las encuestas rotativas"
+author: |
+  | Andrés Gutiérrez.
+  | Stalyn Guerrero.
+institute: "CEPAL - Unidad de Estadísticas Sociales"
+format: 
+  beamer: 
+    colortheme: dove
+    fonttheme: default
+    incremental: false
+    aspectratio: 1610
+    #theme: Berkeley
+    toc: true
+    slide_level: 2
+    #highlight: pygments
+Email: andres.gutierrez@cepal.org
+lang: es
+editor_options:
+  markdown:
+    wrap: 90
+bibliography: CEPAL.bib
+---
+
+```{r, echo=FALSE}
+input <- "Data"
+```
+
+
+## Procesamiento longitudinal de las Encuestas Rotativas
+
+Algunos INE requieren sistemas de **ponderación longitudinal** para generar estadísticas
+basadas en el **seguimiento continuo de hogares** bajo esquemas rotativos.
+
+Una **encuesta longitudinal** observa los **mismos elementos muestrales en distintos
+momentos del tiempo.** @Lynn_2009
+
+**Permite estimar cambios entre periodos consecutivos, considerando:**
+
+    -   Varianza del primer y segundo periodo\
+    -   Correlación entre ellos
+
+**Estos elementos se usan para:**
+
+    -   Calcular coeficientes de variación\
+    -   Ajustar tamaños muestrales
+
+## Diseño de paneles rotativos en las encuestas de la región
+
+Un **diseño de panel rotativo** permite entrevistar una misma vivienda durante varios
+periodos consecutivos antes de reemplazarla.\
+
+Esto ayuda a **medir cambios en el tiempo** (ocupación, ingresos, pobreza, etc.) sin
+necesidad de una encuesta totalmente nueva cada vez.
+
+El esquema más común es el **4(0)1**:
+
+-   Cada vivienda participa durante 4 trimestres.
+
+-    Cada trimestre, se reemplaza el 25% de la muestra.
+
+-    Esto genera traslapes del 75%, 50% y 25% entre trimestres sucesivos.
+
+## Generación de bases longitudinales para dos periodos consecutivos.
+
+Para analizar cambios brutos, se comparan las respuestas de los mismos individuos en dos
+trimestres.
+
+Se requiere construir **pesos longitudinales** que reflejen correctamente la población
+objetivo en ambos periodos, siguiendo la metodología de *Verma, Betti y Ghellini*:
+
+**Pesos iniciales**
+
+$$d_{(1,k)}^{básico}= \dfrac{d_{(1,k)}}{Pr(\text{selección de paneles})}$$
+
+
+-   $d_{(1,k)}^{básico}$ Es el peso de diseño original del hogar k perteneciente al panel 1
+
+-   $Pr(\text{selección de paneles})$ Es la probabilidad de que un panel haya sido seleccionado. Para nuestro ejemplo práctico es $Pr(\text{selección de paneles}) = \frac{2}{4}$
+
+
+**Pesos longitudinales**
+
+-    Definen la población que permanece entre periodos
+
+-    Ajustan por ausencia de respuesta y atrición 
+
+-    Se calibran para conservar la representatividad
+
+
+## Cargue de base de datos y librerias {.smaller}
+
+```{r, echo=TRUE, warning=FALSE, error=FALSE, message=FALSE}
+library(printr)
+library(tidyverse)
+library(tidyr)
+library(pROC)
+library(survey)
+library(haven)
+
+```
+
+```{r, echo=TRUE, c}
+base_personas <- readRDS(file.path(input, "base_personas.rds")) %>% 
+  ungroup()
+base_hogares <- base_personas %>% distinct(upm, trimestre, id_hogar, fep)
+head(base_hogares) 
+```
+
+## Cargue de base de datos y librerias {.smaller}
+```{r, echo=TRUE}
+base_hogares  %>% group_by(trimestre) %>% tally(name = "hogares")
+base_hogares %>% distinct(trimestre, upm)  %>%
+  group_by(trimestre) %>% tally(name = "upm")
+```
+
+```{r, echo=TRUE}
+# Paso 1: identificar hogares que aparecen en ambos trimestres
+hogares_ambos <- base_hogares %>%
+  group_by(id_hogar) %>% count() %>%
+  filter(n == 2) %>% pull(id_hogar)
+
+base_t1 <- base_hogares %>% 
+  filter(trimestre == "t1") %>% select(id_hogar, fep_t1 = fep) 
+
+
+length(hogares_ambos)
+```
+## Cargue de base de datos y librerias {.smaller}
+```{r, echo=TRUE}
+# Paso 2: crear variable dicotómica de respuesta en ambos trimestres
+base_t1_t2 <- base_hogares %>%
+  mutate(respboth = if_else(id_hogar %in% hogares_ambos, 1, 0)) %>% 
+  inner_join(base_t1, by = "id_hogar")
+
+head(base_t1_t2 %>% filter(respboth == 1), 10)
+```
+
+## Creación de los pesos longitudinales
+
+```{r, echo=TRUE}
+# Paso 3: asignar peso básico (solo a hogares que respondieron en ambos)
+
+
+prob_panel <- 2/4
+base_t1_t2 <- base_t1_t2 %>%
+  mutate( fep_long = ifelse(respboth == 1, fep_t1/prob_panel,0)
+  )
+
+head(base_t1_t2 %>% select(trimestre,id_hogar, respboth, fep_t1, fep_long))
+```
+## Creación de los pesos longitudinales
+
+### Ajuste por ausencia de respuesta y atrición
+
+**¿Por qué se ajustan los pesos?**
+
+En una base longitudinal, no todos los hogares responden en todos los periodos. Para evitar sesgos, es necesario ajustar los pesos longitudinales iniciales teniendo en cuenta la probabilidad de respuesta.
+
+$$
+\phi_{1, k} = Pr(D_{1, k} = 1|I_{1, k} = 1) = f(\mathbf{x}_{1}, \boldsymbol\beta)
+$$
+Siendo:
+- $D_{1, k}$ Indica si la persona del hogar respondió la encuesta.
+- $I_{1, k}$ Indica si la persona pertenece a la muestra del primer periodo.
+
+## Creación de los pesos longitudinales
+
+### Ajuste por falta de respuesta de las personas de cada hogar
+
+```{r, echo=TRUE}
+#Paso 5: Identicar las personas en los hogares respondieron en ambos trimestre
+
+base_personas_t1_t2 <- base_personas %>% 
+  filter(id_hogar %in% hogares_ambos) %>% 
+  mutate(id_llave = paste0(id_hogar, id_pers))
+
+hogares_personas <- base_personas_t1_t2 %>% 
+  group_by(id_llave) %>%   count() %>%
+  filter(n == 2) %>% pull(id_llave)
+
+base_personas_t1_t2 <- base_personas_t1_t2 %>%
+  mutate(respboth_per = if_else(id_llave %in% hogares_personas, 1, 0))
+
+base_personas_t1_t2 <- base_personas_t1_t2 %>% inner_join(base_t1_t2 %>% select(id_hogar, fep_long, trimestre), by = c("id_hogar","trimestre"))
+```
+
+### Ajuste por falta de respuesta de las personas de cada hogar
+
+```{r, echo=TRUE}
+# Paso 6: estimar modelo logístico de probabilidad de respuesta
+modelo_logit <- glm(respboth_per ~ pobreza + area + etnia + sexo + edad,
+                    data = base_personas_t1_t2,
+                    family = binomial(link = "logit"))
+
+# Paso 7: predecir la probabilidad de respuesta
+
+prob_resp = predict(modelo_logit, type = "response")
+base_personas_t1_t2$prob_resp = prob_resp
+
+roc_obj <- roc(base_personas_t1_t2$respboth_per, base_personas_t1_t2$prob_resp)
+```
+
+## Creación de los pesos longitudinales
+
+### Ajuste por falta de respuesta de las personas de cada hogar
+
+```{r , r, echo=TRUE, fig.width=5, fig.height=3 }
+plot(roc_obj, main = paste("Curva ROC - AUC:", round(auc(roc_obj), 3)))
+```
+## Creación de los pesos longitudinales
+ 
+### Ajuste por falta de respuesta de las personas de cada hogar
+
+Una vez modelada la no respuesta, los pesos básicos se ajustan mediante el inverso de la probabilidad de respuesta entre los efectivamente respondientes del primer periodo, generando así el primer conjunto de pesos iniciales para las bases longitudinales.
+
+$$
+d_{1, k}^{inicial} = \frac{d_{1, k}^{básico}}{\hat{\phi}_{1, k}}
+$$
+
+```{r, echo=TRUE}
+
+# Paso 8: ajustar el peso longitudinal inicial 
+# usando el inverso de la probabilidad
+base_personas_t1_t2 <- base_personas_t1_t2 %>%
+  mutate(fep_aj = fep_long / prob_resp)
+                                  
+
+```
+## Creación de los pesos longitudinales
+ 
+### Ajuste por falta de respuesta de las personas de cada hogar
+
+```{r, echo=TRUE}
+head(base_personas_t1_t2 %>% select(id_hogar, id_pers ,trimestre,
+                           fep_long, fep_aj))
+```
+
+
+
+
+## Creación de los pesos longitudinales
+
+### Calibración de los pesos longitudinales 
+```{r, echo=TRUE}
+# Paso 9. Definir los totales poblacionales conocidos para calibrar
+total_pob <- c( area1 =  1076892, area2 = 162876,
+  sexoMujer = 615528) 
+# sexoHombre = 1076892 + 162876 - 615528                   
+
+# Paso 10. Crear diseño muestral con los pesos longitudinales ajustados
+design_long <- svydesign(
+  ids = ~upm,  # Suponiendo muestreo sin conglomerados
+  strata = ~estrato,
+  data = base_personas_t1_t2,
+  weights = ~fep_aj
+)
+# summary(design_long)
+
+
+```
+
+
+## Creación de los pesos longitudinales
+
+### Calibración de los pesos longitudinales 
+```{r, echo=TRUE}
+# Paso 11. Calibrar por área y sexo 
+
+design_cali <- calibrate(
+  design = design_long,
+  formula = ~0+area + sexo,           
+  population = total_pob
+) %>% as_survey()
+
+summary(weights(design_cali))
+
+```
+
+
+## Calibración de los pesos longitudinales 
+
+### Validación de la calibración 
+
+```{r, echo=TRUE}
+design_cali %>% group_by(area)  %>% 
+  cascade(total = survey_total(), .fill = "Nacional")
+
+design_cali %>% group_by(sexo)  %>% 
+  cascade(total = survey_total(),.fill = "Nacional")
+
+
+```
+
+## Creación de los pesos longitudinales
+
+### Calibración de los pesos longitudinales 
+
+```{r, echo=TRUE}
+base_personas_t1_t2$fex_cali <- weights(design_cali)
+
+
+```
+## Generación de bases longitudinales anuales
+
+**¿Qué es una base longitudinal?**
+
+Una base longitudinal permite seguir a los mismos hogares o personas a lo largo de varios trimestres (por ejemplo, durante todo un año), combinando datos de diferentes periodos para observar cambios en el tiempo.
+
+**Aspectos clave**
+
+- Solo incluye hogares o personas que respondieron en todos los trimestres (T1-T4).
+
+- Se usan pesos calibrados longitudinales, representando la población del primer trimestre.
+
+- No reemplaza análisis transversales oficiales.
+
+## Generación de bases longitudinales anuales
+
+```{r, echo=TRUE}
+
+head(base_personas_t1_t2 %>% select(id_hogar, id_pers,respboth_per,
+                           fep_long, fep_aj, fex_cali))
+
+```
+
+## Análisis de flujos brutos y matrices de transición
+
+**¿Qué permite el análisis longitudinal?**
+
+- Identificar cambios en el estado de una misma unidad observacional entre periodos consecutivos.
+
+- Descomponer los cambios netos observados en encuestas transversales.
+
+- Analizar si los mismos individuos entran, salen o permanecen en un estado (ej. ocupación, desempleo).
+
+## Matrices de transición en encuestas longitudinales
+
+Los levantamientos longitudinales permiten analizar cómo cambian los estados de las unidades observadas entre dos periodos consecutivos, lo que posibilita estimar flujos brutos mediante tablas de contingencia.
+
+Muchas encuestas de hogares utilizan diseños de panel rotativo, lo que permite realizar seguimiento continuo a los mismos entrevistados. Sin embargo, es común enfrentar problemas de ausencia de respuesta, los cuales pueden estar relacionados con el estado de ocupación y generar sesgos si no se ajustan adecuadamente.
+
+## Modelos de Markov
+
+Los modelos de Markov permiten estimar cambios brutos entre categorías (como estados ocupacionales) a través del tiempo, incluso cuando hay ausencia de respuesta. Se parte de una matriz de transición que muestra cómo los individuos cambian de estado entre dos periodos. Este enfoque se basa en probabilidades de transición entre categorías y permite ajustar por no respuesta.
+
+En un proceso de dos etapas:
+1. Se modela la transición real entre estados (cadena de Markov).
+2. Se modela la probabilidad de que cada transición sea observada o no (mecanismo de respuesta).
+
+
+## Modelos de Markov
+
+**Modelo A**:  
+  ▫️ Misma probabilidad de respuesta y seguimiento para todos los estados  
+  ▫️ Modelo más simple, sin diferencias entre grupos
+
+**Modelo B**  
+  ▫️ La respuesta inicial depende del estado en el primer periodo  
+  ▫️ El seguimiento es igual para todos
+
+**Modelo C**  
+  ▫️ La entrada al panel es igual para todos  
+  ▫️ El seguimiento depende del estado inicial
+
+**Modelo D**  
+  ▫️ La entrada al panel es igual para todos  
+  ▫️ El seguimiento depende del estado final
+
+## Estimación de las matrices de transición
+
+A continuación, se presenta un ejemplo aplicado utilizando la misma base de datos empleada anteriormente. El objetivo es estimar las matrices de transición entre los diferentes niveles de situación de pobreza en dos trimestres consecutivos, con base en la clasificación de los individuos según su condición de pobreza.
+
+
+```{r, echo=FALSE}
+base_ancha <- base_t1_t2 %>%   
+  select(id_hogar, trimestre, pobreza,`_feh`) %>%
+  mutate(pobreza = haven::as_factor(pobreza)) %>% 
+  pivot_wider(
+    names_from = trimestre,
+    values_from = pobreza,
+    names_prefix = "T"
+  )
+head(base_ancha)
+```
+## Estimación de las matrices de transición
+
+```{r, echo=TRUE}
+# Tabla de transición pobreza T1 vs T2
+tabla_trans <- base_ancha %>%
+  filter(!is.na(T1) & !is.na(T2)) %>%
+  count(T1, T2) %>%
+  pivot_wider(names_from = T2, values_from = n, values_fill = 0)
+
+# Complemento fila: solo respondieron en Trimestre 1
+comp_fila <- base_ancha %>%
+  filter(!is.na(T1) & is.na(T2)) %>%
+  count(T1, name = "Complemento_fila")
+
+
+```
+
+## Estimación de las matrices de transición
+
+```{r, echo=TRUE}
+# Complemento columna: solo respondieron en Trimestre 2
+comp_col <- base_ancha %>%
+  filter(is.na(T1) & !is.na(T2)) %>%
+  count(T2, name = "Complemento_columna")
+
+# Unir tabla completa
+tabla_final <- tabla_trans %>%
+  left_join(comp_fila, by = "T1") %>%
+  bind_rows(
+    comp_col %>%
+      pivot_wider(names_from = T2, values_from = Complemento_columna, values_fill = 0) %>%
+      mutate(T1 = "Complemento columna",
+             Complemento_fila = sum(across(where(is.numeric))))
+  )
+```
+
+## Estimación de las matrices de transición
+
+###Table: Distribución observada de los flujos brutos en la muestra no ponderada con ausencia de respuesta en ambos periodos.
+```{r, echo=TRUE}
+
+tabla_final
+```
+Se aplica el mismo procedimiento anterior, pero en lugar de contar los casos, se realiza la suma de los factores de expansión correspondientes.
+
+## Estimación de las matrices de transición
+
+```{r, echo=FALSE}
+
+# Tabla de transición ponderada pobreza T1 vs T2
+tabla_trans <- base_ancha %>%
+  filter(!is.na(T1) & !is.na(T2)) %>%
+  group_by(T1, T2) %>%
+  summarise(valor = sum(`_feh`), .groups = "drop") %>%
+  pivot_wider(names_from = T2, values_from = valor, values_fill = 0)
+
+# Complemento fila: solo respondieron en T1
+comp_fila <- base_ancha %>%
+  filter(!is.na(T1) & is.na(T2)) %>%
+  group_by(T1) %>%
+  summarise(Complemento_fila = sum(`_feh`), .groups = "drop")
+
+# Complemento columna: solo respondieron en T2
+comp_col <- base_ancha %>%
+  filter(is.na(T1) & !is.na(T2)) %>%
+  group_by(T2) %>%
+  summarise(Complemento_columna = sum(`_feh`), .groups = "drop")
+
+# Unir tabla completa
+tabla_final2 <- tabla_trans %>%
+  left_join(comp_fila, by = "T1") %>%
+  bind_rows(
+    comp_col %>%
+      pivot_wider(names_from = T2
+                  , values_from = Complemento_columna, values_fill = 0) %>%
+      mutate(T1 = "Complemento columna",
+             Complemento_fila = sum(across(where(is.numeric))))
+  )
+```
+
+
+###Table: Distribución poblacional estimada de los flujos brutos ausencia de respuesta en ambos periodos.
+
+
+```{r, echo=TRUE}
+
+tabla_final2
+```
+
+
