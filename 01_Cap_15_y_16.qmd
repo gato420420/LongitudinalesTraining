@@ -54,7 +54,7 @@ input <- "Data"
 
 ## Introducción  
 
-> Según @Lynn_2009, una encuesta longitudinal observa los mismos elementos a lo largo del tiempo. Muchas encuestas rotativas, como las de empleo, se pueden convertir en longitudinales si se estructura adecuadamente el seguimiento.
+ Según @Lynn_2009, una encuesta longitudinal observa los mismos elementos a lo largo del tiempo. Muchas encuestas rotativas, como las de empleo, se pueden convertir en longitudinales si se estructura adecuadamente el seguimiento.
 
 
 
@@ -76,7 +76,7 @@ input <- "Data"
 
 \
 
-> "Uno de los retos metodológicos clave es que las muestras no son independientes. Para estimar cambios correctamente, debemos considerar la varianza en cada ronda y la correlación entre observaciones repetidas."
+ "Uno de los retos metodológicos clave es que las muestras no son independientes. Para estimar cambios correctamente, debemos considerar la varianza en cada ronda y la correlación entre observaciones repetidas."
 
 
 # Análisis posibles con datos longitudinales
@@ -263,52 +263,509 @@ length(hogares_ambos)
 
 ## Fundamentos para la generación de bases longitudinales
 
-- El análisis longitudinal permite observar transiciones individuales o de hogares entre estados (ocupación, pobreza, etc.) y **no es viable en todas las encuestas**, solo en aquellas con **esquemas rotativos** planificados.
+- El análisis longitudinal permite observar transiciones individuales o de hogares entre estados (ocupación, pobreza, etc.) y __no es viable en todas las encuestas__, solo en aquellas con _esquemas rotativos_ planificados.
 
 - Es posible construir **tablas de transición** entre dos periodos a partir de observaciones empalmadas de la misma unidad.
 
-### Enfoque de estimación de flujos brutos @Feinberg_Stasny_1983:
+## Enfoque de estimación de flujos brutos @Feinberg_Stasny_1983:
 
-* Considera las diferencias entre pesos de muestreo en dos momentos como producto de la dinámica poblacional (ingresos y salidas del marco).
-* **Ejemplo ilustrativo:**
-
-  * Si un individuo fue empleado en \$t-1\$ y \$t\$, y sus pesos fueron 300 y 305:
-
-    * Se asigna 300 a la celda (Empleado–Empleado).
-    * Se asigna 5 a (Fuera–Empleado).
-  * Este enfoque **conserva el total poblacional** y respeta los cambios reales observados.
+- Considera las diferencias entre pesos de muestreo en dos momentos como producto de la dinámica poblacional (ingresos y salidas del marco).
 
 
-### 📊 **Slide 6: Procedimiento para generación de pesos longitudinales**
+- Supongamos que un individuo fue clasificado como **empleado** tanto en el periodo $t-1$ como en el periodo $t$.
 
-**Metodología (Verma, Betti & Ghellini):**
+
+## **Ejemplo:**
+
+- Asuma que su peso muestral en el primer periodo fue $w_k^{t-1} = 300$ y en el segundo $w_k^t = 305$:
+
+
+1. Se asignan **300** (el mínimo entre ambos pesos) a la celda *(Empleado → Empleado)*.
+
+2. La diferencia **5** se atribuye a la celda *(Fuera → Empleado)*, asumiendo que provienen de entradas netas a la población de interés.
+
+
+- Inversamente, si $w_k^{t-1} = 305$ y $w_k^t = 300$:
+
+1. Se asignan **300** a la celda *(Empleado → Empleado)*.
+
+2. La diferencia **5** se asigna a la celda *(Empleado → Fuera)*, representando salidas netas del marco poblacional.
+
+
+## Procedimiento para generación de pesos longitudinales**
+
+**Metodología @Verma_Betti_Ghellini:**
 
 **1. Pesos iniciales (transversales):**
 
-* Basados en el diseño muestral, ajustados por:
+Basados en el diseño muestral, ajustados por:
 
   * Probabilidad de selección por panel.
+  
   * No respuesta y cobertura.
 
 **2. Pesos longitudinales (dos periodos):**
 
-* Ajustes aplicados:
+Ajustes aplicados:
 
   * **Población longitudinal efectiva** (hogares presentes en ambos periodos).
+  
   * **Atrición muestral** (pérdida de casos por falta de seguimiento).
+  
   * **Calibración final** para alinear con totales poblacionales conocidos.
 
-**Consideraciones técnicas:**
+## Consideraciones técnicas
 
 * El tamaño de la base longitudinal **disminuye** a medida que se incrementa el número de periodos integrados (máximo 4 en diseño 4(0)1).
+
 * **Agrega mediciones, pero reduce unidades únicas**: más observaciones por individuo, menos individuos distintos.
 
-> 💬 *Comentario sugerido:*
-> "Este proceso permite generar estimaciones longitudinales consistentes, controlando las pérdidas por atrición y garantizando comparabilidad intertemporal."
 
----
 
-¿Deseas que desarrolle una **tercera diapositiva** explicando cómo implementar esto en R con código para unir paneles y construir los pesos, o prefieres continuar con la siguiente sección teórica del capítulo? También puedo ayudarte a armar una tabla con el flujo paso a paso como apoyo visual.
+## Consolidación de bases longitudinales
+
+El primer paso en la generación de pesos longitudinales consiste en consolidar las bases de datos correspondientes a los periodos de interés. Esta integración produce bases de distintos tamaños según la cantidad de periodos combinados —por ejemplo, dos, tres o cuatro trimestres consecutivos.
+
+- En términos generales:
+
+ 1. Cuantos menos periodos se integren, mayor será el número de unidades observacionales disponibles.
+
+ 2. En el caso específico de un esquema rotativo 4(0)1, no es posible consolidar cinco periodos consecutivos, ya que la rotación garantiza traslape máximo en solo cuatro trimestres consecutivos.
+
+## Implicaciones de la integración de paneles
+
+La consolidación de paneles implica dos efectos clave:
+
+- _Agregación de información:_ Se repiten las observaciones de los mismos individuos en múltiples periodos, lo que enriquece el análisis longitudinal y permite estimar dinámicas de cambio.
+
+- _Reducción de unidades observacionales:_ Al requerir presencia continua en todos los periodos seleccionados, se pierde cobertura muestral frente al total de la muestra transversal en cada periodo.
+
+Por tanto, se debe balancear el análisis de cambios individuales con la representatividad estadística que puede verse comprometida al aumentar la exigencia de continuidad en los datos.
+
+
+
+## Creación de los pesos longitudinales iniciales
+
+El proceso inicia con la definición de los **periodos consecutivos** que se desean combinar.
+
+En el caso del año 2020, se deben considerar los cambios operativos causados por la pandemia:
+
+ * A partir del segundo trimestre, los levantamientos dejaron de ser presenciales.
+
+ * Esto impactó tanto la tasa de respuesta como la comparabilidad entre trimestres.
+
+Solo se incluirán las unidades muestrales que **respondieron en todos los periodos** seleccionados.
+
+
+##  Determinación de pesos básicos
+
+Los pesos longitudinales iniciales se derivan a partir de los **pesos básicos ajustados por cobertura** del primer periodo de combinación.
+
+Ejemplos:
+
+- Para combinar **T1 y T2 de 2020**, se parte de los pesos ajustados del **primer trimestre**.
+
+- Para combinar **T2 y T3**, se toman los pesos del **segundo trimestre**.
+
+Según @LaRoche_2003, los pesos básicos se corrigen por la probabilidad de selección de paneles:
+
+ $$
+ d_{1, k}^{básico} = \frac{d_{1, k}}{\Pr(\text{selección de paneles})}
+ $$
+
+
+## Consideraciones y validaciones
+
+- En el ejemplo de **T1 y T2**, si tres paneles coinciden de cuatro posibles, entonces:
+   $\Pr(\text{selección de paneles}) = \frac{3}{4}$.
+
+- En **T2 y T3**, con la muestra replicada debido a la pandemia:
+   $\Pr(\text{selección de paneles}) = \frac{4}{4} = 1$.
+
+**Validación clave**:
+
+La suma de pesos básicos debe aproximar el tamaño poblacional:
+$$\sum_{s^{(1)}} d_{1, k}^{básico} \approx N$$
+
+Además, como propone la metodología de la *Survey of Labour and Income Dynamics* [@Naud_2002; @LaRoche_2003], este ajuste inicial incorpora la **probabilidad de traslape**.
+
+## Creación de los pesos longitudinales {.smaller}
+
+### Paso 2: crear variable dicotómica de respuesta en ambos trimestres
+
+```{r, echo=TRUE}
+
+base_t1_t2 <- base_hogares %>%
+  mutate(respboth = if_else(id_hogar %in% hogares_ambos, 1, 0)) %>% 
+  inner_join(base_t1, by = "id_hogar")
+
+head(base_t1_t2 %>% filter(respboth == 1), 6)
+```
+
+## Creación de los pesos longitudinales
+
+### Paso 3: asignar peso básico (solo a hogares que respondieron en ambos)
+
+```{r, echo=TRUE}
+prob_panel <- 2/4
+base_t1_t2 <- base_t1_t2 %>%
+  mutate( fep_long = ifelse(respboth == 1, fep_t1/prob_panel,0)
+  )
+sum(base_t1_t2$fep_long)
+base_personas %>% group_by(trimestre) %>%
+  summarise(pob_estimada = sum(fep))
+```
+
+## Creación de los pesos longitudinales
+
+```{r, echo=TRUE}
+head(base_t1_t2 %>%
+       select(trimestre, id_hogar,
+              respboth, fep_t1, fep_long), 10)
+```
+
+## Ajuste por ausencia de respuesta
+
+- Sobre los **pesos básicos**, se debe realizar un ajuste por **no respuesta**.
+
+- Este ajuste debe basarse en:
+  - Covariables auxiliares disponibles en el marco de muestreo.
+  
+  - Registros administrativos o rondas previas.
+  
+- Las unidades que no respondieron deben ser excluidas:
+  
+$$
+d_{1, k}^{básico} = 0, \quad \forall k \notin s_r^{(1)}
+$$
+
+donde $s_r^{(1)}$ representa el conjunto de respondientes efectivos del primer periodo.
+
+
+## Modelo de propensión de respuesta
+
+- Se modela la **probabilidad de respuesta**:
+  
+$$
+\phi_{1,k} = \Pr(D_{1,k} = 1 \mid I_{1,k} = 1) = f(\mathbf{x}_1, \boldsymbol\beta)
+$$
+donde $D_{1, k}$ indica si la persona del hogar respondió la encuesta y  $I_{1, k}$ si la persona pertenece a la muestra del primer periodo.
+
+- Comúnmente se usa un **modelo logístico**:
+
+$$
+\hat{\phi}_{1,k} = \frac{\exp(\mathbf{x}_1' \hat{\boldsymbol\beta})}{1 + \exp(\mathbf{x}_1' \hat{\boldsymbol\beta})}
+$$
+
+- Requiere que $\mathbf{x}_1$ esté disponible para todos los seleccionados (respondan o no).
+
+
+## Ajuste final del peso inicial
+
+- Se ajustan los pesos por el inverso de la probabilidad estimada:
+
+$$
+d_{1,k}^{inicial} = \frac{d_{1,k}^{básico}}{\hat{\phi}_{1,k}}
+$$
+
+- En ausencia de información auxiliar: Usar la **tasa media de respuesta** como imputación para $\hat{\phi}_{1,k}$.
+  
+- Si la unidad es nueva en el panel: Imputar el **peso del hogar** al que pertenece.
+
+- Verificar:
+
+  - **Balanceo** entre respondientes y no respondientes.
+
+  - **Soporte común** entre distribuciones de propensión (evitar extremos 0 y 1).
+
+
+## Creación de los pesos longitudinales
+
+### Paso 4: Identicar las personas en los hogares respondieron en ambos trimestre
+
+Para construir una base de datos longitudinal consistente, es necesario identificar a las personas que respondieron en ambos trimestres (T1 y T2), dentro de los hogares previamente identificados como comunes.
+
+\small
+
+```{r, echo=TRUE}
+base_personas_t1_t2 <- base_personas %>% 
+  filter(id_hogar %in% hogares_ambos) %>% 
+  mutate(id_llave = paste0(id_hogar, id_pers))
+
+hogares_personas <- base_personas_t1_t2 %>% 
+  group_by(id_llave) %>%   count() %>%
+  filter(n == 2) %>% pull(id_llave)
+
+base_personas_t1_t2 <- base_personas_t1_t2 %>%
+  mutate(respboth_per = if_else(id_llave %in% hogares_personas, 1, 0))
+
+base_personas_t1_t2 <- base_personas_t1_t2 %>%
+  inner_join(base_t1_t2 %>% 
+               select(id_hogar, fep_long, trimestre), 
+             by = c("id_hogar","trimestre"))
+```
+
+## Ajuste por falta de respuesta de personas
+
+### Paso 5: estimar modelo logístico de probabilidad de respuesta
+
+Se utiliza un modelo de regresión logística para estimar la probabilidad de que una persona haya respondido en ambos trimestres, en función de características observables.
+
+```{r, echo=TRUE}
+modelo_logit <- glm(respboth_per ~ pobreza + area + etnia + sexo + edad,
+                    data = base_personas_t1_t2,
+                    family = binomial(link = "logit"))
+```
+
+## Estimación de la probabilidad de respuesta
+
+### Paso 6: predecir la probabilidad de respuesta.
+
+Se predicen las probabilidades individuales de respuesta, las cuales luego serán utilizadas para ajustar los pesos longitudinales.
+
+```{r, echo=TRUE}
+prob_resp = predict(modelo_logit, type = "response")
+base_personas_t1_t2$prob_resp = prob_resp
+
+roc_obj <- roc(base_personas_t1_t2$respboth_per, 
+               base_personas_t1_t2$prob_resp)
+```
+
+## Evaluación del modelo: Curva ROC
+
+La curva ROC permite verificar la capacidad predictiva del modelo de propensión. El área bajo la curva (AUC) debe acercarse a 1 para un buen ajuste.
+
+```{r , r, echo=TRUE, fig.width=4, fig.height=2.5 }
+plot(roc_obj, main = paste("Curva ROC - AUC:", round(auc(roc_obj), 3)))
+```
+
+## Ajuste del peso longitudinal inicial 
+
+### Paso 7: ajustar el peso longitudinal inicial usando el inverso de la probabilidad
+
+El factor de expansión longitudinal se ajusta dividiendo el peso original entre la probabilidad de respuesta estimada.
+
+```{r, echo=TRUE}
+
+base_personas_t1_t2 <- base_personas_t1_t2 %>%
+  mutate(fep_aj = fep_long / prob_resp)
+                                  
+
+```
+## Visualización del ajuste de pesos
+
+Se revisan los valores originales y ajustados para verificar consistencia y posibles extremos. 
+
+```{r, echo=TRUE}
+head(base_personas_t1_t2 %>% select(id_hogar, id_pers ,trimestre,
+                           fep_long, fep_aj))
+```
+
+## Creación de los pesos longitudinales finales
+
+### Definición de la población longitudinal
+
+- La población longitudinal está compuesta por las personas que permanecen en la población objetivo entre dos periodos consecutivos.
+
+- Ejemplo: en una encuesta del 2020, la población longitudinal del primer semestre incluye personas presentes tanto en el primer como en el segundo trimestre.
+
+
+## Creación de los pesos longitudinales finales
+
+### Exclusión por salida de la población
+
+- Entre los dos periodos, pueden haber personas que salen de la población objetivo (muerte, migración, institucionalización, etc.).
+
+- Estas personas no deben formar parte del análisis longitudinal, aunque sí están en la población objetivo del segundo periodo.
+
+
+## Creación de los pesos longitudinales finales
+
+### Muestra longitudinal y asignación de pesos
+
+- La muestra longitudinal se define como:
+
+$$
+s^{(2)} = s^1 \cap s^2
+$$
+
+- El peso longitudinal inicial se transfiere directamente:
+
+$$
+d^{\text{final}}_{k} = d^{\text{inicial}}_{1,k}
+$$
+
+**Se recomienda calibrar con totales auxiliares si están disponibles.**
+
+
+## Ausencia de respuesta y atrición {.smaller}
+
+- No todas las unidades responden en ambos periodos.
+
+- Se identifican tres subconjuntos:
+
+  a. Respondieron en t1 pero no en t2.
+
+  b. No respondieron en t1 pero sí en t2.
+
+  c. No respondieron en ninguno.
+
+* Solo se mantienen las unidades que respondieron en ambos.
+
+
+
+## Asignación de peso nulo a los no respondientes {.smaller}
+
+* Para unidades que no están en ambos periodos:
+
+$$
+d_{2, k}^{inicial} =
+\begin{cases}
+d_{1, k}^{inicial}, &\text{si } k \in s_r^{(2)} \\
+0, &\text{si } k \notin s_r^{(2)}
+\end{cases}
+$$
+
+- $s_r^{(2)}$ representa a las unidades respondientes en ambos periodos.
+
+
+## Ajuste por respuesta en segundo periodo {.smaller}
+
+- Se estima la probabilidad de respuesta en el segundo periodo:
+
+$$
+\phi_{2, k} = Pr(D_{2, k} = 1 \mid I_{2, k} = 1) = f(\mathbf{x}_{2}, \boldsymbol{\beta})
+$$
+
+- Utilizar covariables auxiliares $\mathbf{x}_2$ disponibles para todos los seleccionados.
+
+
+## Peso longitudinal ajustado {.smaller}
+
+- El ajuste final del peso longitudinal se hace mediante el inverso de la probabilidad de respuesta en el segundo periodo:
+
+$$
+d_{2, k}^{longitudinal} = \frac{d_{2, k}^{inicial}}{\hat{\phi}_{2, k}}
+$$
+
+- Este peso se utiliza para representar adecuadamente la población longitudinal.
+
+
+## Calibración de los pesos longitudinales {.smaller}
+
+- Tras el ajuste por no respuesta, se recomienda calibrar los pesos.
+
+- La calibración busca alinear los pesos con totales poblacionales conocidos:
+
+  - Proyecciones nacionales.
+  
+  - Distribución por sexo, edad, región, área, etc.
+
+
+## Restricción de calibración {.smaller}
+
+- Las variables auxiliares se denotan como $\mathbf{z}_k$.
+
+- Se impone la siguiente condición:
+
+$$
+\sum_{s_r^{(2)}} w_{2, k}^{calibrado} \, \mathbf{z}_k = \sum_{U} \mathbf{z}_k
+$$
+
+- Donde $s_r^{(2)}$ representa a los respondientes en ambos periodos.
+
+
+## Forma funcional del peso calibrado {.smaller}
+
+- Los pesos calibrados se definen como:
+
+$$
+w_{2, k}^{calibrado} = g_k \cdot d_{2, k}^{longitudinal}
+$$
+
+- $g_k$: factor de calibración, idealmente cercano a 1.
+
+- $d_{2, k}^{longitudinal}$: peso longitudinal ajustado por no respuesta.
+
+
+## Consideraciones adicionales {.smaller}
+
+- Las restricciones deben referirse a la población del **primer periodo**.
+
+- La muestra longitudinal **no representa entradas posteriores**, solo a quienes estaban presentes al inicio.
+
+
+## Creación de los pesos longitudinales
+
+### Paso 8: Definir totales poblacionales conocidos {.smaller}
+
+```{r}
+# Totales poblacionales por área y sexo
+total_pob <- c(
+  area1 = 1076892, 
+  area2 = 162876,
+  sexoMujer = 615528
+  # sexoHombre = 1076892 + 162876 - 615528
+)
+```
+
+
+## Creación de los pesos longitudinales
+
+### Paso 9: Crear diseño muestral con pesos ajustados {.smaller}
+
+```{r}
+library(survey)
+library(srvyr)
+design_long <- svydesign(
+  ids = ~upm,            # Asumiendo muestreo sin conglomerados
+  strata = ~estrato,     # Variable de estrato
+  data = base_personas_t1_t2,
+  weights = ~fep_aj      # Peso ajustado por no respuesta
+)
+```
+
+
+## Calibración de los pesos longitudinales
+
+### Paso 10: Ajuste por calibración por área y sexo {.smaller}
+
+```{r}
+design_cali <- calibrate(
+  design = design_long,
+  formula = ~0 + area + sexo,  # Efectos fijos (sin intercepto)
+  population = total_pob
+) %>% 
+  as_survey()
+```
+
+
+## Calibración de los pesos longitudinales
+
+### Validación de la calibración {.smaller}
+
+```{r}
+options(survey.lonely.psu="adjust")
+# Validación por área
+design_cali %>% 
+  group_by(area) %>% 
+  cascade(total = survey_total(), .fill = "Nacional")
+
+# Validación por sexo
+design_cali %>% 
+  group_by(sexo) %>% 
+  cascade(total = survey_total(), .fill = "Nacional")
+```
+
+
+
+## Creación de los pesos longitudinales
+
+### Paso final: Asignar pesos calibrados a la base {.smaller}
+
+```{r}
+base_personas_t1_t2$fex_cali <- weights(design_cali)
+```
 
 
 
