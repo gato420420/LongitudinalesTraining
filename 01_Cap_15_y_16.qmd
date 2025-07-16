@@ -191,7 +191,7 @@ La figura ilustra tres esquemas longitudinales que pueden derivarse del diseño 
 - **T1 vs T4:** 50% de traslape.
 
 
-## Cargue de base de datos y librerias {.smaller}
+## Cargue de base de datos y librerias 
 
 \small
 
@@ -218,13 +218,13 @@ head(base_hogares, 10)
 
 ```
 
-## Cargue de base de datos y librerias {.smaller}
+## Cargue de base de datos y librerias 
 
 ```{r, lectura_data, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 ```
 
 
-## Muestra de UPMs por trimestre {.smaller}
+## Muestra de UPMs por trimestre 
 
 -   Número de hogares por trimestre
 ```{r, echo=TRUE}
@@ -240,7 +240,7 @@ base_hogares %>%   distinct(trimestre, upm) %>%
 
 ```
 
-## Número de UPMs en el traslape   {.smaller}
+## Número de UPMs en el traslape   
 
 ### Paso 1: identificar hogares que aparecen en ambos trimestres
 
@@ -389,7 +389,7 @@ $$\sum_{s^{(1)}} d_{1, k}^{básico} \approx N$$
 
 Además, como propone la metodología de la *Survey of Labour and Income Dynamics* [@Naud_2002; @LaRoche_2003], este ajuste inicial incorpora la **probabilidad de traslape**.
 
-## Creación de los pesos longitudinales {.smaller}
+## Creación de los pesos longitudinales 
 
 ### Paso 2: crear variable dicotómica de respuesta en ambos trimestres
 
@@ -598,7 +598,7 @@ $$
 **Se recomienda calibrar con totales auxiliares si están disponibles.**
 
 
-## Ausencia de respuesta y atrición {.smaller}
+## Ausencia de respuesta y atrición 
 
 - No todas las unidades responden en ambos periodos.
 
@@ -614,7 +614,7 @@ $$
 
 
 
-## Asignación de peso nulo a los no respondientes {.smaller}
+## Asignación de peso nulo a los no respondientes 
 
 * Para unidades que no están en ambos periodos:
 
@@ -629,7 +629,7 @@ $$
 - $s_r^{(2)}$ representa a las unidades respondientes en ambos periodos.
 
 
-## Ajuste por respuesta en segundo periodo {.smaller}
+## Ajuste por respuesta en segundo periodo 
 
 - Se estima la probabilidad de respuesta en el segundo periodo:
 
@@ -640,7 +640,7 @@ $$
 - Utilizar covariables auxiliares $\mathbf{x}_2$ disponibles para todos los seleccionados.
 
 
-## Peso longitudinal ajustado {.smaller}
+## Peso longitudinal ajustado 
 
 - El ajuste final del peso longitudinal se hace mediante el inverso de la probabilidad de respuesta en el segundo periodo:
 
@@ -651,7 +651,7 @@ $$
 - Este peso se utiliza para representar adecuadamente la población longitudinal.
 
 
-## Calibración de los pesos longitudinales {.smaller}
+## Calibración de los pesos longitudinales 
 
 - Tras el ajuste por no respuesta, se recomienda calibrar los pesos.
 
@@ -662,7 +662,7 @@ $$
   - Distribución por sexo, edad, región, área, etc.
 
 
-## Restricción de calibración {.smaller}
+## Restricción de calibración 
 
 - Las variables auxiliares se denotan como $\mathbf{z}_k$.
 
@@ -675,7 +675,7 @@ $$
 - Donde $s_r^{(2)}$ representa a los respondientes en ambos periodos.
 
 
-## Forma funcional del peso calibrado {.smaller}
+## Forma funcional del peso calibrado 
 
 - Los pesos calibrados se definen como:
 
@@ -688,7 +688,7 @@ $$
 - $d_{2, k}^{longitudinal}$: peso longitudinal ajustado por no respuesta.
 
 
-## Consideraciones adicionales {.smaller}
+## Consideraciones adicionales 
 
 - Las restricciones deben referirse a la población del **primer periodo**.
 
@@ -697,9 +697,9 @@ $$
 
 ## Creación de los pesos longitudinales
 
-### Paso 8: Definir totales poblacionales conocidos {.smaller}
+### Paso 8: Definir totales poblacionales conocidos 
 
-```{r}
+```{r, echo=TRUE}
 # Totales poblacionales por área y sexo
 total_pob <- c(
   area1 = 1076892, 
@@ -712,9 +712,9 @@ total_pob <- c(
 
 ## Creación de los pesos longitudinales
 
-### Paso 9: Crear diseño muestral con pesos ajustados {.smaller}
+### Paso 9: Crear diseño muestral con pesos ajustados 
 
-```{r}
+```{r, echo=TRUE}
 library(survey)
 library(srvyr)
 design_long <- svydesign(
@@ -728,32 +728,36 @@ design_long <- svydesign(
 
 ## Calibración de los pesos longitudinales
 
-### Paso 10: Ajuste por calibración por área y sexo {.smaller}
+### Paso 10: Ajuste por calibración por área y sexo 
 
-```{r}
+```{r, echo=TRUE}
 design_cali <- calibrate(
   design = design_long,
   formula = ~0 + area + sexo,  # Efectos fijos (sin intercepto)
   population = total_pob
-) %>% 
-  as_survey()
+) %>%   as_survey()
+summary(weights(design_long)); summary(weights(design_cali))
 ```
 
 
 ## Calibración de los pesos longitudinales
 
-### Validación de la calibración {.smaller}
+### Validación de la calibración 
 
-```{r}
+```{r, echo=TRUE}
 options(survey.lonely.psu="adjust")
 # Validación por área
-design_cali %>% 
-  group_by(area) %>% 
+design_cali %>%   group_by(area) %>% 
   cascade(total = survey_total(), .fill = "Nacional")
+```
 
+## Calibración de los pesos longitudinales
+
+### Validación de la calibración 
+
+```{r, echo=TRUE}
 # Validación por sexo
-design_cali %>% 
-  group_by(sexo) %>% 
+design_cali %>%   group_by(sexo) %>% 
   cascade(total = survey_total(), .fill = "Nacional")
 ```
 
@@ -761,12 +765,240 @@ design_cali %>%
 
 ## Creación de los pesos longitudinales
 
-### Paso final: Asignar pesos calibrados a la base {.smaller}
+### Paso final: Asignar pesos calibrados a la base 
 
-```{r}
+```{r, echo=TRUE}
 base_personas_t1_t2$fex_cali <- weights(design_cali)
 ```
 
+# Análisis de flujos brutos y matrices de transición
+
+
+## Análisis de flujos brutos 
+
+¿Por qué usar datos longitudinales?
+
+- Permiten conocer el **estado de una unidad** en distintos periodos.
+
+- Posibilitan el análisis de **flujos brutos** entre categorías (por ejemplo, ocupación).
+
+- Se pueden descomponer los **cambios netos** estimados en cortes transversales.
+
+\
+
+>“La principal ventaja de los datos longitudinales es la posibilidad de estimar los flujos brutos.” - @Lynn_2009
+
+
+## Análisis de flujos brutos 
+
+**Ejemplo conceptual**
+
+- Una encuesta rotativa permite estimar cuántas personas **cambiaron** de estado ocupacional.
+
+- El análisis muestra si los “nuevos ocupados” en realidad ya lo eran en el trimestre anterior.
+
+**Ejemplo:**
+
+- A partir del seguimiento en dos trimestres, se puede saber si quienes estaban empleados, desempleados o inactivos, **mantuvieron o cambiaron** su estado.
+
+
+
+## Importancia del diseño y la no respuesta 
+
+1. ¿Qué puede sesgar los flujos brutos?
+
+    - La **ausencia de respuesta** raramente es aleatoria.
+
+    - Por ejemplo, los desempleados tienden a no responder más frecuentemente.
+
+2. Riesgos:
+
+    - Si se **ignora la ausencia de respuesta**, los flujos brutos estarán sesgados.
+
+    - Si se corrige por no respuesta, pero se ignora el **diseño muestral**, también se introduce sesgo.
+
+
+## Matrices de transición 
+
+-  Permiten estudiar **cambios de estado** entre dos periodos (ej. de ocupado a desempleado).
+
+-  Se construyen con unidades **respondientes en ambos periodos**.
+
+- Fundamentales para entender dinámicas del mercado laboral.
+
+
+
+### **Diseño complejo y flujos** 
+
+- Las encuestas de hogares usan **muestreo complejo**: estratificado, multietápico, con probabilidades desiguales.
+
+- Los **factores de expansión deben reflejar** este diseño para obtener estimaciones válidas.
+
+
+
+## Ausencia de respuesta y sesgos 
+
+- La no respuesta puede depender del **estado ocupacional** (ej. más no respuesta entre desempleados).
+
+- Por eso, al estimar matrices de transición, se deben usar **pesos longitudinales ajustados y calibrados**.
+
+
+
+## Modelos de Markov 
+
+- Se utilizan para modelar los **cambios entre categorías** en dos periodos consecutivos.
+
+- Asumen que los individuos pueden transitar entre **G estados mutuamente excluyentes**.
+
+
+
+### **Transiciones en el tiempo**
+
+- El interés se centra en la **estimación de flujos brutos**: cambios reales entre estados.
+
+- Solo se observa una muestra, pero el objetivo es **inferir la matriz poblacional de transición**.
+
+
+
+## Estructura de la matriz de transición 
+
+Sea $X_{ij}$  la **cantidad de personas** que pasaron del estado $i$ al $j$.
+
+\small
+
+| Estado (T1/T2)         | 1        | 2        | $\cdots$ | j        | $\cdots$ | G        |
+|----------|----------|----------|----------|----------|----------|----------|
+| 1        | $X_{11}$ | $X_{12}$ | $\cdots$ | $X_{1j}$ | $\cdots$ | $X_{1G}$ |
+| 2        | $X_{21}$ | $X_{22}$ | $\cdots$ | $X_{2j}$ | $\cdots$ | $X_{2G}$ |
+| $\vdots$ | $\vdots$ | $\vdots$ | $\ddots$ | $\vdots$ | $\ddots$ | $\vdots$ |
+| i        | $X_{i1}$ | $X_{i2}$ | $\cdots$ | $X_{ij}$ | $\cdots$ | $X_{iG}$ |
+| $\vdots$ | $\vdots$ | $\vdots$ | $\ddots$ | $\vdots$ | $\ddots$ | $\vdots$ |
+| G        | $X_{G1}$ | $X_{G2}$ | $\cdots$ | $X_{Gj}$ | $\cdots$ | $X_{GG}$ |
+
+Table: Distribución no observable de los flujos brutos en una población.
+
+ 
+## Supuestos y limitaciones 
+
+- Se asume que la matriz de transición es **homogénea** para la población.
+
+- La **ausencia de respuesta no ignorable** puede sesgar la estimación si no se corrige adecuadamente.
+
+- Es fundamental **ajustar pesos y considerar el diseño muestral**.
+
+
+## Modelos de Markov con no respuesta 
+
+- Suponen que cada individuo pertenece a uno de $G$ estados.
+
+- Se modela el cambio de estado entre $t-1$ y $t$ mediante:
+
+  - $\eta_i$: probabilidad de estar en el estado $i$ en $t-1$.
+  
+  - $p_{ij}$: probabilidad de transición de $i$ a $j$.
+
+
+### **Restricciones de los parámetros** 
+
+- Suma total de probabilidades iniciales:
+
+  $$
+  \sum_i \eta_i = 1
+  $$
+- Para cada fila $i$ en la matriz de transición:
+
+  $$
+  \sum_j p_{ij} = 1
+  $$
+
+
+## Clasificación según respuesta 
+
+Tres grupos de individuos:
+
+  1. Respondieron en ambos periodos → matriz $G \times G$.
+  
+  2. Solo respondieron en uno → complemento fila o columna.
+  
+  3. No respondieron en ninguno → celda $M$.
+
+
+## Distribución observable con no respuesta 
+
+| T1 / T2    | Formal   | Informal | Desocupado | Inactivo | Comp. fila |
+| ---------- | -------- | -------- | ---------- | -------- | ---------- |
+| Formal     | $N_{11}$ | $N_{12}$ | $N_{13}$   | $N_{14}$ | $R_1$      |
+| Informal   | $N_{21}$ | $N_{22}$ | $N_{23}$   | $N_{24}$ | $R_2$      |
+| Desocupado | $N_{31}$ | $N_{32}$ | $N_{33}$   | $N_{34}$ | $R_3$      |
+| Inactivo   | $N_{41}$ | $N_{42}$ | $N_{43}$   | $N_{44}$ | $R_4$      |
+| Comp. col. | $C_1$    | $C_2$    | $C_3$      | $C_4$    | $M$        |
+
+
+## Segunda etapa: proceso de respuesta 
+
+Cada individuo puede responder o no en cada periodo. Se introducen:
+
+1. $\psi(i,j)$: probabilidad de respuesta en $t-1$ estando en celda $ij$.
+
+2. $\rho_{RR}(i,j)$: probabilidad de seguir respondiendo en $t$.
+
+3. $\rho_{MM}(i,j)$: probabilidad de seguir sin responder en $t$.
+
+
+## Modelos reducidos de no respuesta 
+
+Para estimar los parámetros de respuesta, se proponen modelos con supuestos específicos sobre la dependencia entre la respuesta y el estado de clasificación laboral.
+
+**Modelo A**: Probabilidades constantes 
+
+- $\psi(i,j) = \psi$: misma probabilidad de respuesta en $t-1$ para todos.
+
+- $\rho_{RR}(i,j) = \rho_{RR}$: misma probabilidad de mantenerse respondiente.
+
+- $\rho_{MM}(i,j) = \rho_{MM}$: misma probabilidad de mantenerse ausente.
+
+- **No depende del estado laboral.**
+
+## Modelos reducidos de no respuesta 
+
+**Modelo B**: Respuesta inicial según estado 
+
+- $\psi(i,j) = \psi(i)$: depende del estado en $t-1$.
+
+- $\rho_{RR}(i,j) = \rho_{RR}$, $\rho_{MM}(i,j) = \rho_{MM}$: constantes.
+
+- **Distingue entre formales, informales, etc. al inicio.**
+
+**Modelo C**: Transiciones según estado en $t-1$ 
+
+- $\psi(i,j) = \psi$: constante.
+
+- $\rho_{RR}(i,j) = \rho_{RR}(i)$: depende del estado en $t-1$.
+
+- $\rho_{MM}(i,j) = \rho_{MM}(i)$.
+
+- **Transiciones diferenciadas por estado inicial.**
+
+
+## Modelos reducidos de no respuesta 
+
+**Modelo D**: Transiciones según estado en $t$ 
+
+- $\psi(i,j) = \psi$: constante.
+
+- $\rho_{RR}(i,j) = \rho_{RR}(j)$, $\rho_{MM}(i,j) = \rho_{MM}(j)$: dependen del estado final.
+
+- **Transiciones diferenciadas por estado destino.**
+
+
+
+## Estimación con pseudo-verosimilitud 
+
+* Metodología de @Feinberg_Stasny_1983 extendida por @Gutierrez_2014.
+
+* Se usa **máxima pseudo-verosimilitud** bajo muestreo complejo.
+
+* Implementado en el paquete `surf` de R @Jacob_2020.
 
 
 ## ¡Gracias!
