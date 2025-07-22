@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+data_2017N.dta
+base_personas.rds
+00_Creacion_data_mes.R
+01_Creacion_data_upm.R
