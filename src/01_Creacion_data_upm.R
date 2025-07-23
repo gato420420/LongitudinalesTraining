@@ -87,10 +87,10 @@ base_hogar <- base_hogar %>%
     ingreso = ifelse(trimestre == "t1", ingreso, ingreso + rnorm(1,0, 10000)),
     unif = runif(n()),
     pobreza = case_when(
-      trimestre == "t2" & pobreza == "1" & unif < 0.03 ~ "2",
-      trimestre == "t2" & pobreza == "2" & unif < 0.05 ~ "1",
-      trimestre == "t2" & pobreza == "3" & unif < 0.03 ~ "2",
-      trimestre == "t2" & pobreza == "2" & unif < 0.07 ~ "3",
+      trimestre == "t2" & pobreza == "1" & unif < 0.05 ~ "2",
+      trimestre == "t2" & pobreza == "2" & unif < 0.1 ~ "1",
+      trimestre == "t2" & pobreza == "3" & unif < 0.07 ~ "2",
+      trimestre == "t2" & pobreza == "2" & unif < 0.1 ~ "3",
       TRUE ~ pobreza
     )
   )
