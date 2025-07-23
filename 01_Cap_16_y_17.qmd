@@ -1,6 +1,6 @@
 ---
-title: "Ánalisis de las encuestas de hodares con R"
-subtitle: "Cápitulos: Procesamiento longitudinal de las encuestas rotativas"
+title: "Ánalisis de las encuestas de hogares con R"
+subtitle: "Procesamiento longitudinal de las encuestas rotativas"
 author: |
   | Andrés Gutiérrez.
   | Stalyn Guerrero. 
@@ -32,7 +32,7 @@ input <- "Data"
 ## Introducción 
 
 
-### ¿Por qué pensar en procesamiento longitudinal?
+**¿Por qué pensar en procesamiento longitudinal?**
 
 
 - Algunas oficinas requieren estadísticas de seguimiento continuo.
@@ -43,13 +43,13 @@ input <- "Data"
 
 
 
-### ¿Qué es una encuesta longitudinal?
+**¿Qué es una encuesta longitudinal?**
 
-* Recolecta información sobre los mismos elementos en múltiples momentos.
+- Recolecta información sobre los mismos elementos en múltiples momentos.
 
-* Contrasta con levantamientos transversales.
+- Contrasta con levantamientos transversales.
 
-* Un ejemplo: esquema rotativo 4(1)0 permite seguimiento anual de 25%.
+- Un ejemplo: esquema rotativo 4(1)0 permite seguimiento anual de 25%.
 
 
 ## Introducción  
@@ -62,21 +62,21 @@ input <- "Data"
 ## Estimación del cambio y la varianza
 
 
-* El foco está en estimar cambios entre periodos consecutivos.
+- El foco está en estimar cambios entre periodos consecutivos.
 
-* Es necesario calcular:
+- Es necesario calcular:
 
-  * Varianza del periodo 1
+  a. Varianza del periodo 1
   
-  * Varianza del periodo 2
+  b. Varianza del periodo 2
   
-  * Correlación entre ambos
+  c. Correlación entre ambos
   
-* Esos elementos afectan CV y tamaño de muestra.
+- Esos elementos afectan CV y tamaño de muestra.
 
 \
 
- "Uno de los retos metodológicos clave es que las muestras no son independientes. Para estimar cambios correctamente, debemos considerar la varianza en cada ronda y la correlación entre observaciones repetidas."
+>Uno de los retos metodológicos clave es que las muestras no son independientes. Para estimar cambios correctamente, debemos considerar la varianza en cada ronda y la correlación entre observaciones repetidas.
 
 
 # Análisis posibles con datos longitudinales
@@ -84,25 +84,26 @@ input <- "Data"
 
 ##  Caracterización de transiciones individuales
 
-* Identificación de hogares/personas que cambian de estatus.
+- Identificación de hogares/personas que cambian de estatus.
 
-* Análisis de las características de quienes _entran o salen_ de situaciones como la pobreza extrema, incluso sin cambios netos agregados.
+- Análisis de las características de quienes _entran o salen_ de situaciones como la pobreza extrema, incluso sin cambios netos agregados.
 
  _Estabilidad e inestabilidad en el tiempo_
 
-* Seguimiento prolongado permite detectar *trayectorias persistentes* o *fluctuaciones*.
-* Comprensión más profunda de los factores que **explican la permanencia en condiciones como la pobreza extrema**.
+- Seguimiento prolongado permite detectar *trayectorias persistentes* o *fluctuaciones*.
+
+- Comprensión más profunda de los factores que **explican la permanencia en condiciones como la pobreza extrema**.
 
 
 ## Duración, eventos e impactos
 
-### Caracterización de eventos y duración
+_Caracterización de eventos y duración_
 
 - Estudio de la *duración de estados*: cuánto tiempo se permanece desempleado, inactivo, fuera del sistema educativo, etc.
 
 - Posibilidad de construir *indicadores de duración y persistencia*.
 
-###  Evaluación de impactos y relaciones causales
+_Evaluación de impactos y relaciones causales_
 
 - Estimación del **efecto de intervenciones** o choques externos (ej. COVID-19) sobre fenómenos como la **desocupación**.
 
@@ -116,7 +117,7 @@ input <- "Data"
   
   - Generar estimaciones robustas sobre cambios de estado (e.g., ocupación ↔ inactividad).
   
-- La dimensión longitudinal se configura sobre los hogares que __respondieron efectivamente en más de un periodo__, permitiendo análisis más allá de los cortes transversales.
+- La dimensión longitudinal se configura sobre los hogares que _respondieron efectivamente en más de un periodo_, permitiendo análisis más allá de los cortes transversales.
 
 
 
@@ -159,7 +160,7 @@ La figura ilustra tres esquemas longitudinales que pueden derivarse del diseño 
 3. **Anual (T1–T4):**
 
 
-![Tres escenarios longitudinales en un esquema rotativo 4(0)1.](Imagenes/15_cap/el1.png){width="400"}
+![Tres escenarios longitudinales en un esquema rotativo 4(0)1.](Imagenes/15_cap/el1.png){width="450"}
 
 
 ## Efectos del COVID-19 en el esquema rotativo – Año 2020
@@ -204,8 +205,9 @@ library(pROC)       # Curvas ROC
 library(survey)     # Análisis de encuestas con diseño muestral complejo
 
 # Carga de la base de datos a nivel de personas
-base_personas <- readRDS(file.path(input, "base_personas.rds")) %>%
-  ungroup()  # Elimina cualquier agrupamiento previo
+base_personas <- readRDS(file.path(input, "base_anual.rds")) %>%  
+  filter(trimestre %in% c("T1", "T2")) %>% 
+  ungroup() # Eliminar agrupamientos previos
 
 # Creación de la base a nivel de hogares, extrayendo variables
 # clave sin duplicados
@@ -253,7 +255,7 @@ hogares_ambos <- base_hogares %>%
 
 # Extrae los pesos del trimestre 1 para los hogares que serán comparados
 base_t1 <- base_hogares %>%
-  filter(trimestre == "t1") %>%   select(id_hogar, fep_t1 = fep)
+  filter(trimestre == "T1") %>%   select(id_hogar, fep_t1 = fep)
 
 # Número total de hogares con traslape en dos trimestres
 length(hogares_ambos)
@@ -269,50 +271,46 @@ length(hogares_ambos)
 
 ## Enfoque de estimación de flujos brutos @Feinberg_Stasny_1983:
 
-- Considera las diferencias entre pesos de muestreo en dos momentos como producto de la dinámica poblacional (ingresos y salidas del marco).
+Considera las diferencias entre pesos de muestreo en dos momentos como producto de la dinámica poblacional (ingresos y salidas del marco).
 
+**Ejemplo:**
 
-- Supongamos que un individuo fue clasificado como **empleado** tanto en el periodo $t-1$ como en el periodo $t$.
+Supongamos que un individuo fue clasificado como **empleado** tanto en el periodo $t-1$ como en el periodo $t$.
 
+1.   Asuma que su peso muestral en el primer periodo fue $w_k^{t-1} = 300$ y en el segundo $w_k^t = 305$:
+
+   - Se asignan **300** (el mínimo entre ambos pesos) a la celda *(Empleado → Empleado)*.
+
+   - La diferencia **5** se atribuye a la celda *(Fuera → Empleado)*, asumiendo que provienen de entradas netas a la población de interés.
 
 ## **Ejemplo:**
 
-- Asuma que su peso muestral en el primer periodo fue $w_k^{t-1} = 300$ y en el segundo $w_k^t = 305$:
+2. Inversamente, si $w_k^{t-1} = 305$ y $w_k^t = 300$:
+
+  - Se asignan **300** a la celda *(Empleado → Empleado)*.
+
+  - La diferencia **5** se asigna a la celda *(Empleado → Fuera)*, representando salidas netas del marco poblacional.
 
 
-1. Se asignan **300** (el mínimo entre ambos pesos) a la celda *(Empleado → Empleado)*.
-
-2. La diferencia **5** se atribuye a la celda *(Fuera → Empleado)*, asumiendo que provienen de entradas netas a la población de interés.
-
-
-- Inversamente, si $w_k^{t-1} = 305$ y $w_k^t = 300$:
-
-1. Se asignan **300** a la celda *(Empleado → Empleado)*.
-
-2. La diferencia **5** se asigna a la celda *(Empleado → Fuera)*, representando salidas netas del marco poblacional.
-
-
-## Procedimiento para generación de pesos longitudinales**
-
-**Metodología @Verma_Betti_Ghellini:**
+## Metodología @Verma_Betti_Ghellini:
 
 **1. Pesos iniciales (transversales):**
 
 Basados en el diseño muestral, ajustados por:
 
-  * Probabilidad de selección por panel.
+  - Probabilidad de selección por panel.
   
-  * No respuesta y cobertura.
+  - No respuesta y cobertura.
 
 **2. Pesos longitudinales (dos periodos):**
 
 Ajustes aplicados:
 
-  * **Población longitudinal efectiva** (hogares presentes en ambos periodos).
+  - **Población longitudinal efectiva** (hogares presentes en ambos periodos).
   
-  * **Atrición muestral** (pérdida de casos por falta de seguimiento).
+  - **Atrición muestral** (pérdida de casos por falta de seguimiento).
   
-  * **Calibración final** para alinear con totales poblacionales conocidos.
+  - **Calibración final** para alinear con totales poblacionales conocidos.
 
 ## Consideraciones técnicas
 
@@ -326,11 +324,11 @@ Ajustes aplicados:
 
 El primer paso en la generación de pesos longitudinales consiste en consolidar las bases de datos correspondientes a los periodos de interés. Esta integración produce bases de distintos tamaños según la cantidad de periodos combinados —por ejemplo, dos, tres o cuatro trimestres consecutivos.
 
-- En términos generales:
+_En términos generales_:
 
- 1. Cuantos menos periodos se integren, mayor será el número de unidades observacionales disponibles.
+  1. Cuantos menos periodos se integren, mayor será el número de unidades observacionales disponibles.
 
- 2. En el caso específico de un esquema rotativo 4(0)1, no es posible consolidar cinco periodos consecutivos, ya que la rotación garantiza traslape máximo en solo cuatro trimestres consecutivos.
+  2. En el caso específico de un esquema rotativo 4(0)1, no es posible consolidar cinco periodos consecutivos, ya que la rotación garantiza traslape máximo en solo cuatro trimestres consecutivos.
 
 ## Implicaciones de la integración de paneles
 
@@ -350,9 +348,9 @@ El proceso inicia con la definición de los **periodos consecutivos** que se des
 
 En el caso del año 2020, se deben considerar los cambios operativos causados por la pandemia:
 
- * A partir del segundo trimestre, los levantamientos dejaron de ser presenciales.
+ - A partir del segundo trimestre, los levantamientos dejaron de ser presenciales.
 
- * Esto impactó tanto la tasa de respuesta como la comparabilidad entre trimestres.
+ - Esto impactó tanto la tasa de respuesta como la comparabilidad entre trimestres.
 
 Solo se incluirán las unidades muestrales que **respondieron en todos los periodos** seleccionados.
 
@@ -370,7 +368,7 @@ Ejemplos:
 Según @LaRoche_2003, los pesos básicos se corrigen por la probabilidad de selección de paneles:
 
  $$
- d_{1, k}^{básico} = \frac{d_{1, k}}{\Pr(\text{selección de paneles})}
+ d_{1, k}^{\text{básico}} = \frac{d_{1, k}}{\Pr(\text{selección de paneles})}
  $$
 
 
@@ -385,7 +383,7 @@ Según @LaRoche_2003, los pesos básicos se corrigen por la probabilidad de sele
 **Validación clave**:
 
 La suma de pesos básicos debe aproximar el tamaño poblacional:
-$$\sum_{s^{(1)}} d_{1, k}^{básico} \approx N$$
+$$\sum_{s^{(1)}} d_{1, k}^{\text{básico}} \approx N$$
 
 Además, como propone la metodología de la *Survey of Labour and Income Dynamics* [@Naud_2002; @LaRoche_2003], este ajuste inicial incorpora la **probabilidad de traslape**.
 
@@ -393,13 +391,13 @@ Además, como propone la metodología de la *Survey of Labour and Income Dynamic
 
 ### Paso 2: crear variable dicotómica de respuesta en ambos trimestres
 
-```{r, echo=TRUE}
+```{r, echo=TRUE, warning=FALSE}
 
 base_t1_t2 <- base_hogares %>%
   mutate(respboth = if_else(id_hogar %in% hogares_ambos, 1, 0)) %>% 
   inner_join(base_t1, by = "id_hogar")
 
-head(base_t1_t2 %>% filter(respboth == 1), 6)
+head(base_t1_t2 %>% filter(respboth == 1) , 8)
 ```
 
 ## Creación de los pesos longitudinales
@@ -481,7 +479,7 @@ $$
 
 ## Creación de los pesos longitudinales
 
-### Paso 4: Identicar las personas en los hogares respondieron en ambos trimestre
+### _Paso 4: Identicar las personas en los hogares respondieron en ambos trimestre_\
 
 Para construir una base de datos longitudinal consistente, es necesario identificar a las personas que respondieron en ambos trimestres (T1 y T2), dentro de los hogares previamente identificados como comunes.
 
@@ -495,7 +493,13 @@ base_personas_t1_t2 <- base_personas %>%
 hogares_personas <- base_personas_t1_t2 %>% 
   group_by(id_llave) %>%   count() %>%
   filter(n == 2) %>% pull(id_llave)
+```
 
+## Creación de los pesos longitudinales
+
+Identificando las personas que respondieron en los dos trimestres. 
+
+```{r, echo=TRUE}
 base_personas_t1_t2 <- base_personas_t1_t2 %>%
   mutate(respboth_per = if_else(id_llave %in% hogares_personas, 1, 0))
 
@@ -507,14 +511,15 @@ base_personas_t1_t2 <- base_personas_t1_t2 %>%
 
 ## Ajuste por falta de respuesta de personas
 
-### Paso 5: estimar modelo logístico de probabilidad de respuesta
-
+### _Paso 5: estimar modelo logístico de probabilidad de respuesta_
+\
 Se utiliza un modelo de regresión logística para estimar la probabilidad de que una persona haya respondido en ambos trimestres, en función de características observables.
 
 ```{r, echo=TRUE}
-modelo_logit <- glm(respboth_per ~ pobreza + area + etnia + sexo + edad,
+modelo_logit <- glm(respboth_per ~ sexo+ ingreso,
                     data = base_personas_t1_t2,
                     family = binomial(link = "logit"))
+# summary(modelo_logit)
 ```
 
 ## Estimación de la probabilidad de respuesta
@@ -541,7 +546,7 @@ plot(roc_obj, main = paste("Curva ROC - AUC:", round(auc(roc_obj), 3)))
 
 ## Ajuste del peso longitudinal inicial 
 
-### Paso 7: ajustar el peso longitudinal inicial usando el inverso de la probabilidad
+### _Paso 7: ajustar el peso longitudinal inicial usando el inverso de la probabilidad_
 
 El factor de expansión longitudinal se ajusta dividiendo el peso original entre la probabilidad de respuesta estimada.
 
@@ -561,33 +566,33 @@ head(base_personas_t1_t2 %>% select(id_hogar, id_pers ,trimestre,
                            fep_long, fep_aj))
 ```
 
-## Creación de los pesos longitudinales finales
-
-### Definición de la población longitudinal
+## Definición de la población longitudinal
 
 - La población longitudinal está compuesta por las personas que permanecen en la población objetivo entre dos periodos consecutivos.
 
 - Ejemplo: en una encuesta del 2020, la población longitudinal del primer semestre incluye personas presentes tanto en el primer como en el segundo trimestre.
 
 
-## Creación de los pesos longitudinales finales
-
-### Exclusión por salida de la población
+##  Exclusión por salida de la población
 
 - Entre los dos periodos, pueden haber personas que salen de la población objetivo (muerte, migración, institucionalización, etc.).
 
 - Estas personas no deben formar parte del análisis longitudinal, aunque sí están en la población objetivo del segundo periodo.
 
 
-## Creación de los pesos longitudinales finales
-
-### Muestra longitudinal y asignación de pesos
+##  Muestra longitudinal y asignación de pesos
 
 - La muestra longitudinal se define como:
 
 $$
 s^{(2)} = s^1 \cap s^2
 $$
+
+```{r}
+table(base_personas_t1_t2$respboth_per)
+base_personas_ambos <-  base_personas_t1_t2 %>% filter( respboth_per == 1)
+```
+
 
 - El peso longitudinal inicial se transfiere directamente:
 
@@ -700,15 +705,44 @@ $$
 ### Paso 8: Definir totales poblacionales conocidos 
 
 ```{r, echo=TRUE}
-# Totales poblacionales por área y sexo
-total_pob <- c(
-  area1 = 1076892, 
-  area2 = 162876,
-  sexoMujer = 615528
-  # sexoHombre = 1076892 + 162876 - 615528
-)
+library(openxlsx)
+poblacion <- read.xlsx("Imagenes/15_cap/muestra_anual.xlsx") %>%
+  transmute(estrato = paste0("pp_", dam, "_", area),
+            N_personas)
+total_pob <- setNames(round(poblacion$N_personas),
+                      paste0(poblacion$estrato))
+
+formula_calb <-
+  as.formula(paste0("~ 0 + ", paste0(names(total_pob), collapse = " + ")))
+formula_calb
+
 ```
 
+
+## Creación de los pesos longitudinales
+
+Organizando la base de datos 
+\small
+```{r, echo=TRUE}
+temp <- base_personas_ambos %>%
+  distinct(upm, estrato, id_hogar, id_pers, id_llave, 
+           edad, sexo, area, fep_aj)
+
+temp_pobreza <- base_personas_ambos %>%
+  select(id_llave, trimestre, pobreza) %>%
+  pivot_wider(names_from = trimestre, values_from = pobreza) %>%
+  rename(pobreza_t1 = 'T1', pobreza_t2 = 'T2')
+
+temp  <- temp %>% mutate(estrato_pp = estrato) %>%
+  fastDummies::dummy_columns(select_columns = "estrato_pp",
+                             remove_selected_columns = TRUE) %>%
+  rename_with(.fn = ~ gsub("^estrato_", "", .x),
+              .cols = starts_with("estrato_pp"))
+
+base_personas_trim <- inner_join(temp, temp_pobreza, by = "id_llave")
+
+
+```
 
 ## Creación de los pesos longitudinales
 
@@ -720,7 +754,7 @@ library(srvyr)
 design_long <- svydesign(
   ids = ~upm,            # Asumiendo muestreo sin conglomerados
   strata = ~estrato,     # Variable de estrato
-  data = base_personas_t1_t2,
+  data = base_personas_trim,
   weights = ~fep_aj      # Peso ajustado por no respuesta
 )
 ```
@@ -733,7 +767,7 @@ design_long <- svydesign(
 ```{r, echo=TRUE}
 design_cali <- calibrate(
   design = design_long,
-  formula = ~0 + area + sexo,  # Efectos fijos (sin intercepto)
+  formula = formula_calb,  # Efectos fijos (sin intercepto)
   population = total_pob
 ) %>%   as_survey()
 summary(weights(design_long)); summary(weights(design_cali))
@@ -742,25 +776,13 @@ summary(weights(design_long)); summary(weights(design_cali))
 
 ## Calibración de los pesos longitudinales
 
-### Validación de la calibración 
-
 ```{r, echo=TRUE}
-options(survey.lonely.psu="adjust")
-# Validación por área
-design_cali %>%   group_by(area) %>% 
-  cascade(total = survey_total(), .fill = "Nacional")
+options(survey.lonely.psu="certainty")
+design_cali %>% group_by(estrato) %>%
+  summarise(n_upm = n_distinct(upm),
+            total = survey_total(vartype = "se"))
+
 ```
-
-## Calibración de los pesos longitudinales
-
-### Validación de la calibración 
-
-```{r, echo=TRUE}
-# Validación por sexo
-design_cali %>%   group_by(sexo) %>% 
-  cascade(total = survey_total(), .fill = "Nacional")
-```
-
 
 
 ## Creación de los pesos longitudinales
@@ -768,7 +790,7 @@ design_cali %>%   group_by(sexo) %>%
 ### Paso final: Asignar pesos calibrados a la base 
 
 ```{r, echo=TRUE}
-base_personas_t1_t2$fex_cali <- weights(design_cali)
+base_personas_trim$fex_cali <- weights(design_cali)
 ```
 
 # Análisis de flujos brutos y matrices de transición
@@ -791,13 +813,10 @@ base_personas_t1_t2$fex_cali <- weights(design_cali)
 
 ## Análisis de flujos brutos 
 
-**Ejemplo conceptual**
-
 - Una encuesta rotativa permite estimar cuántas personas **cambiaron** de estado ocupacional.
 
 - El análisis muestra si los “nuevos ocupados” en realidad ya lo eran en el trimestre anterior.
 
-**Ejemplo:**
 
 - A partir del seguimiento en dos trimestres, se puede saber si quienes estaban empleados, desempleados o inactivos, **mantuvieron o cambiaron** su estado.
 
@@ -805,20 +824,22 @@ base_personas_t1_t2$fex_cali <- weights(design_cali)
 
 ## Importancia del diseño y la no respuesta 
 
-1. ¿Qué puede sesgar los flujos brutos?
+¿Qué puede sesgar los flujos brutos?
 
-    - La **ausencia de respuesta** raramente es aleatoria.
+   - La **ausencia de respuesta** raramente es aleatoria.
 
-    - Por ejemplo, los desempleados tienden a no responder más frecuentemente.
+  - Por ejemplo, los desempleados tienden a no responder más frecuentemente.
 
-2. Riesgos:
+Riesgos:
 
-    - Si se **ignora la ausencia de respuesta**, los flujos brutos estarán sesgados.
+  - Si se **ignora la ausencia de respuesta**, los flujos brutos estarán sesgados.
 
-    - Si se corrige por no respuesta, pero se ignora el **diseño muestral**, también se introduce sesgo.
+  - Si se corrige por no respuesta, pero se ignora el **diseño muestral**, también se introduce sesgo.
 
 
-## Matrices de transición 
+## Matrices de transición y diseños complejos
+
+**Matrices de transición** 
 
 -  Permiten estudiar **cambios de estado** entre dos periodos (ej. de ocupado a desempleado).
 
@@ -828,12 +849,11 @@ base_personas_t1_t2$fex_cali <- weights(design_cali)
 
 
 
-### **Diseño complejo y flujos** 
+**Diseño complejo y flujos** 
 
 - Las encuestas de hogares usan **muestreo complejo**: estratificado, multietápico, con probabilidades desiguales.
 
 - Los **factores de expansión deben reflejar** este diseño para obtener estimaciones válidas.
-
 
 
 ## Ausencia de respuesta y sesgos 
@@ -844,15 +864,12 @@ base_personas_t1_t2$fex_cali <- weights(design_cali)
 
 
 
-## Modelos de Markov 
+## Modelos de Markov y transiciones en el tiempo
 
 - Se utilizan para modelar los **cambios entre categorías** en dos periodos consecutivos.
 
 - Asumen que los individuos pueden transitar entre **G estados mutuamente excluyentes**.
 
-
-
-### **Transiciones en el tiempo**
 
 - El interés se centra en la **estimación de flujos brutos**: cambios reales entre estados.
 
@@ -898,7 +915,7 @@ Table: Distribución no observable de los flujos brutos en una población.
   - $p_{ij}$: probabilidad de transición de $i$ a $j$.
 
 
-### **Restricciones de los parámetros** 
+**Restricciones de los parámetros** 
 
 - Suma total de probabilidades iniciales:
 
@@ -999,6 +1016,353 @@ Para estimar los parámetros de respuesta, se proponen modelos con supuestos esp
 * Se usa **máxima pseudo-verosimilitud** bajo muestreo complejo.
 
 * Implementado en el paquete `surf` de R @Jacob_2020.
+
+
+
+## Estimación de matrices de transición
+
+- Se analiza la transición laboral de **41,274 personas** en los dos primeros trimestres de 2020.
+
+- La clasificación incluye: formal, informal, desocupado e inactivo.
+
+- Se observa **alta no respuesta en T2** (complemento fila) → efecto pandemia.
+
+
+## Muestra observada: transiciones T1-T2
+
+| Estado (T1/T2)      | Formal | Informal | Desocupado | Inactivo | Complemento fila |
+|---------------------|--------|----------|------------|----------|------------------|
+| Formal              | 11,483  | 718      | 592        | 1,828     | 451              |
+| Informal            | 703    | 2,513     | 495        | 2,769     | 198              |
+| Desocupado          | 191    | 181      | 503        | 794      | 81               |
+| Inactivo            | 364    | 641      | 388        | 15,386    | 382              |
+| Complemento columna | 160    | 65       | 48         | 257      | 83               |
+Table: Distribución observada de los flujos brutos en la muestra no ponderada con ausencia de respuesta en ambos periodos.
+
+
+## Estimación poblacional (ponderada)
+
+| Estado (T1/T2)      | Formal    | Informal | Desocupado | Inactivo  | Complemento fila |
+|---------------------|-----------|----------|------------|-----------|------------------|
+| Formal              | 3,269,673 | 201,639  | 175,719    | 503,740   | 155,902          |
+| Informal            | 232,095   | 641,565  | 146,416    | 725,006   | 58,649           |
+| Desocupado          | 55,243    | 50,337   | 157,642    | 233,597   | 26,695           |
+| Inactivo            | 102,490   | 161,363  | 98,898     | 4,299,066 | 118,393          |
+| Complemento columna | 47,104    | 26,276   | 19,746     | 100,775   | 25,545           |
+Table: Distribución poblacional estimada de los flujos brutos ausencia de respuesta en ambos periodos.
+
+Total estimado: **15,597,572**
+
+---
+
+## Comparación de modelos {.smaller}
+
+Criterio: ajuste de los modelos mediante estadístico chi-cuadrado.
+
+|                     | Modelo A | Modelo B | Modelo C | Modelo D |
+|---------------------|----------|----------|----------|----------|
+| Grados de libertad  | 7        | 4        | 1        | 1        |
+| Valor crítico       | 14.07    | 9.49     | 3.84     | 3.84     |
+| Valor $\chi^2_{RS}$ | 15.6706  | 18.3659  | 0.2418   | 3.9137   |
+Table: Ajuste de los cuatros modelos. 
+
+
+## Modelo seleccionado: Modelo C
+
+- Mejor ajuste: $\chi^2 = 0.2418$ < valor crítico.
+- Implica:
+
+  - Probabilidad de respuesta constante en $t-1$.
+  
+  - Transiciones de respuesta dependen del estado en $t-1$.
+  
+- **Captura correctamente el patrón observado en pandemia.**
+
+
+
+## Estimación poblacional de los flujos brutos
+
+**Modelo C** Proceso no observable
+
+El modelo C asume:
+
+- Probabilidad de respuesta igual para todos los estados en el tiempo $t-1$: $\psi(i,j) = \psi$.
+
+- Las probabilidades de transición de respuesta dependen del estado en el tiempo $t-1$:
+  $\rho_{RR}(i,j)=\rho_{RR}(i)$, $\rho_{MM}(i,j)=\rho_{MM}(i)$.
+
+
+## Tabla  de distribución poblacional estimada
+
+\tiny
+
+| Estado (T1/T2)      | Formal              | Informal         | Desocupado       | Inactivo            |
+|------------|---------------------|------------------|------------------|---------------------|
+| Formal     | 4.627.632 (102.470) | 287.124 (18.979) | 252.084 (20.399) | 713.284 (30.358)    |
+| Informal   | 327.066 (33.292)    | 911.996 (45.645) | 210.372 (16.508) | 1.022.351 (50.332)  |
+| Desocupado | 79.346 (10.592)     | 72.944 (8.858)   | 230.949 (21.180) | 335.746 (28.023)    |
+| Inactivo   | 143.303 (11.192)    | 227.545 (15.849) | 140.923 (10.550) | 6.014.907 (123.559) |
+
+Table: Distribución poblacional estimada de los flujos brutos para el proceso no observable (sin ausencia de respuesta) en ambos periodos bajo el modelo C. Los errores estándar se muestran en paréntesis.
+
+\normalsize
+
+- La diagonal principal refleja estabilidad en el estatus laboral (p. ej. 6 millones de inactivos que permanecen como tal).
+
+- Las celdas fuera de la diagonal permiten identificar los flujos entre estados, con sus respectivos errores estándar.
+
+## Estimación de las matrices de transición laboral
+
+| Estado (T1/T2)      | Formal        | Informal      | Desocupado    | Inactivo      |
+|------------|---------------|---------------|---------------|---------------|
+| Formal     | 0.787 (0.010) | 0.048 (0.003) | 0.042 (0.003) | **0.121** (0.004) |
+| Informal   | 0.132 (0.012) | 0.368 (0.013) | 0.085 (0.005) | **0.413** (0.013) |
+| Desocupado | 0.110 (0.012) | 0.101 (0.010) | 0.321 (0.021) | **0.466** (0.025) |
+| Inactivo   | 0.021 (0.001) | 0.034 (0.002) | 0.021 (0.001) | **0.921** (0.010) |
+
+Table: Estimación de las matrices de transición laboral en ambos periodos bajo el modelo C. Los errores estándar se muestran en paréntesis.
+
+**Transiciones laborales:** Se estima que:
+
+  - El **12,1%** de los trabajadores formales pasaron a la **inactividad**.
+  
+  - **41,3%** de los informales e **46,6%** de los desocupados también cayeron en la **inactividad**.
+  - El **92,1%** de los inactivos se mantuvo en ese estado.
+
+
+## Modelo C: Resultados clave
+
+| Trimestre I-2020 | $\hat{\eta}$  | $\hat{\rho}_{RR}$ | $\hat{\rho}_{MM}$ |
+|------------------|---------------|-------------------|-------------------|
+| Formal           | 0.376 (0.004) | 0.963 (0.004)     | 0.304 (0.104)     |
+| Informal         | 0.158 (0.003) | 0.967 (0.004)     | 0.000 (0.261)     |
+| Desocupado       | 0.046 (0.002) | 0.949 (0.008)     | 0.000 (0.188)     |
+| Inactivo         | 0.418 (0.004) | 0.975 (0.002)     | 0.017 (0.086)     |
+
+Table: Estimación de los demás parámetros del modelo C. Los errores estándar se muestran en paréntesis.
+
+
+## Comparación por sexo: Impacto diferencial de la pandemia
+
+El modelo C fue ajustado por sexo, mostrando buen ajuste en ambos grupos:
+$\chi^2_\text{hombres}=0.350$ y $\chi^2_\text{mujeres}=0.470$. 
+
+La probabilidad inicial de respuesta fue igual para ambos grupos: $\hat{\psi}=0,981$ (EE = 0,002).
+
+La estimación de las probabilidades $\hat{\rho}_{MM}$ reveló diferencias por sexo:
+
+- **Formales**: mujeres más propensas a no responder en el segundo trimestre ($\hat{\rho}_{MM}=0,331$ vs. $0,253$).
+
+- **Inactivos**: hombres con mayor propensión a no responder ($\hat{\rho}_{MM}=0,112$ vs. $0,000$).
+
+## Matriz de transición laboral — Hombres
+
+|$p_{ij}$ (Hombres)   | Formal        | Informal      | Desocupado    | Inactivo      |
+|------------|---------------|---------------|---------------|---------------|
+| Formal     | 0.791 (0.013) | 0.056 (0.004) | 0.049 (0.005) | 0.102 (0.005) |
+| Informal   | 0.138 (0.011) | 0.403 (0.018) | 0.095 (0.008) | 0.362 (0.017) |
+| Desocupado | 0.146 (0.025) | 0.118 (0.017) | 0.343 (0.031) | 0.392 (0.037) |
+| Inactivo   | 0.031 (0.004) | 0.036 (0.003) | 0.030 (0.003) | 0.902 (0.021) |
+
+Table: Estimación de las matrices de transición laboral para los hombres bajo el modelo C. Los errores estándar se muestran en paréntesis.
+
+
+## Matriz de transición laboral — Mujeres
+
+|$p_{ij}$ (Mujeres)     | Formal        | Informal      | Desocupado    | Inactivo      |
+|------------|---------------|---------------|---------------|---------------|
+| Formal     | 0.781 (0.010) | 0.039 (0.003) | 0.033 (0.003) | 0.145 (0.007) |
+| Informal   | 0.125 (0.012) | 0.331 (0.017) | 0.073 (0.007) | 0.469 (0.018) |
+| Desocupado | 0.078 (0.012) | 0.086 (0.012) | 0.301 (0.028) | 0.534 (0.036) |
+| Inactivo   | 0.017 (0.001) | 0.034 (0.002) | 0.017 (0.001) | 0.931 (0.013) |
+
+Table: Estimación de las matrices de transición laboral para las mujeres bajo el modelo C. Los errores estándar se muestran en paréntesis.
+
+
+## Comparación por sexo: Impacto diferencial de la pandemia
+
+Se observan también diferencias significativas en las transiciones hacia la inactividad:
+
+| Condición Inicial  | Hombres | Mujeres |
+|--------------------|---------|---------|
+| **Formales**       | 10,2%   | 14,5%   |
+| **Informales**     | 36,2%   | 46,9%   |
+| **Desocupados**    | 39,2%   | 53,4%   |
+| **Inactividad persistente** | 90,2% | 93,1% |
+
+**Conclusión**: Las mujeres sufrieron un mayor impacto en términos de salida del mercado laboral hacia la inactividad.
+
+
+## Conteos en la muestra
+
+```{r, pobreza_tb1, echo=TRUE, eval=FALSE}
+base_personas_trim %>%  count(pobreza_t1, pobreza_t2, name = "n") %>% 
+  complete(pobreza_t1 = as.character(1:3),
+           pobreza_t2 = as.character(1:3),
+           fill = list(n = 0)) %>% 
+mutate( pobreza_t1 = case_when(
+   pobreza_t1 ==1 ~  "Pobreza extrema",
+   pobreza_t1 ==2 ~   "Pobreza no extrema",
+  pobreza_t1 ==3 ~    "Fuera de la pobreza"
+  ), 
+  pobreza_t2 = case_when(
+   pobreza_t2 ==1 ~  "Pobreza extrema",
+   pobreza_t2 ==2 ~   "Pobreza no extrema",
+  pobreza_t2 ==3 ~    "Fuera de la pobreza"
+  )
+)  %>% 
+  pivot_wider(names_from = pobreza_t2, values_from = n, values_fill = 0) 
+
+```
+
+## Matriz de observados  
+
+```{r, pobreza_tb1, echo=FALSE, eval=TRUE}
+```
+## Estimación de la población por cambio de estado 
+
+```{r, pobreza_tb2, echo=TRUE, eval=FALSE}
+design_cali %>% group_by(pobreza_t1, pobreza_t2) %>% 
+  summarise(tol_pob = survey_total() ) %>% 
+  mutate(total = paste0(round(tol_pob), " (",round(tol_pob_se), ")" ), 
+         tol_pob = NULL, tol_pob_se = NULL) %>% 
+  mutate( pobreza_t1 = case_when(
+   pobreza_t1 ==1 ~  "Pobreza extrema",
+   pobreza_t1 ==2 ~   "Pobreza no extrema",
+  pobreza_t1 ==3 ~    "Fuera de la pobreza"
+  ), 
+  pobreza_t2 = case_when(
+   pobreza_t2 ==1 ~  "Pobreza extrema",
+   pobreza_t2 ==2 ~   "Pobreza no extrema",
+  pobreza_t2 ==3 ~    "Fuera de la pobreza"
+  )
+) %>% ungroup() %>% 
+  pivot_wider(names_from = pobreza_t2, 
+              values_from = total, values_fill = "0 (0)") 
+
+```
+
+## Matriz de estimada  
+
+```{r, pobreza_tb2, echo=FALSE, eval=TRUE}
+```
+
+## Libreria surf 
+
+```{r, echo=TRUE}
+# remotes::install_github("guilhermejacob/surf")
+library(surf)
+design_cali <-
+  design_cali %>% mutate(
+    pobreza_t1 = factor(
+      pobreza_t1,
+      levels = c(1, 2, 3),
+      labels = c("Pobreza extrema", "Pobreza no extrema",
+                 "Fuera de la pobreza")
+    ),
+    pobreza_t2 = factor(
+      pobreza_t2,
+      levels = c(1, 2, 3),
+      labels = c("Pobreza extrema", "Pobreza no extrema",
+                 "Fuera de la pobreza")
+    )
+  )
+```
+
+## Evaluando el modelo C para la muestra 
+
+```{r, modelo_c, echo=TRUE, eval=TRUE, warning=FALSE}
+model_C <-svyflow(~ pobreza_t1 + pobreza_t2 , model = "C",
+          design = design_cali ,as.zero.flows = TRUE)
+```
+
+- La mayoría se encontraba fuera de la pobreza (66.7%).
+
+```{r, echo=TRUE, eval=TRUE, warning=FALSE}
+coef(model_C$eta)
+```
+
+- Se observa un leve aumento de la pobreza no extrema y extrema.
+
+```{r, echo=TRUE, eval=TRUE, warning=FALSE}
+coef(model_C$gamma)
+```
+
+
+## Respultados del modelo C $p_{ij}$
+
+- El 38.3% de los pobres extremos siguen siéndolo.
+
+- Movilidad moderada desde pobreza no extrema (6.7% caen en pobreza extrema).
+
+
+```{r, modelo_c2, echo=TRUE, eval=TRUE, warning=FALSE}
+coef(model_C$pij)
+```
+
+
+## Evaluando el modelo C para la muestra de hombres
+
+```{r, modelo_ch, echo=TRUE, eval=TRUE, warning=FALSE}
+model_C_H <-svyflow(~ pobreza_t1 + pobreza_t2 , model = "C",
+          design = design_cali  %>% filter(sexo == "Hombre") ,
+          as.zero.flows = TRUE)
+```
+
+- En el segundo periodo (T2), la mayoría de los hombres se ubican fuera de la pobreza (67.0%), mientras que una proporción significativamente menor se encuentra en situación de pobreza no extrema (29.7%) y una proporción aún más baja en pobreza extrema (3.3%).
+
+```{r, echo=F, eval=TRUE, warning=FALSE}
+coef(model_C_H$eta)
+```
+
+- En contraste, en el primer periodo (T1), se observa una mayor proporción de hombres en situación de pobreza no extrema (26.7%) en comparación con la pobreza extrema (2.9%). 
+
+```{r, echo=F, eval=TRUE, warning=FALSE}
+coef(model_C_H$gamma)
+```
+
+## Respultados del modelo C para hombres $p_{ij}$
+
+- Los hombres en pobreza extrema tienen una probabilidad del 78.84% de permanecer allí.
+
+- Los hombres en pobreza no extrema presentan una cierta movilidad hacia la pobreza extrema (5.55%), aunque la mayoría (35.15%) se mantiene en su estado.
+
+
+```{r, echo=TRUE, eval=TRUE, warning=FALSE}
+coef(model_C_H$pij)
+```
+
+
+## Evaluando el modelo C para la muestra de mujeres
+
+```{r, echo=TRUE, eval=TRUE, warning=FALSE}
+model_C_M <-svyflow(~ pobreza_t1 + pobreza_t2 , model = "C",
+          design = design_cali  %>% filter(sexo == "Mujer") ,
+          as.zero.flows = TRUE)
+```
+- La gran mayoría de las mujeres no se encuentran en situación de pobreza al inicio, aunque cerca del 33.51% se encuentra en alguna forma de pobreza (extrema o no extrema).
+
+```{r, echo=FALSE, eval=TRUE, warning=FALSE}
+coef(model_C_M$eta)
+```
+
+- Se observa un aumento en la pobreza entre las mujeres
+
+```{r, echo=FALSE, eval=TRUE, warning=FALSE}
+coef(model_C_M$gamma)
+```
+
+
+
+## Respultados del modelo C para mujeres  $p_{ij}$
+
+- Alta persistencia de la pobreza extrema entre mujeres: 39.69% permanecen en ese estado.
+
+- Las mujeres fuera de la pobreza tienen una probabilidad del 25.64% de caer en pobreza no extrema.
+
+```{r, echo=TRUE, eval=TRUE, warning=FALSE}
+coef(model_C_M$pij)
+```
 
 
 ## ¡Gracias!

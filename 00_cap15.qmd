@@ -1,0 +1,1402 @@
+---
+title: "Análisis de encuestas de hogares con R"
+subtitle: "Agregación de encuestas"
+institute: "CEPAL - Unidad de Estadísticas Sociales"
+format: 
+  beamer: 
+    colortheme: dove
+    fonttheme: default
+    incremental: false
+    aspectratio: 1610
+    #theme: Berkeley
+    toc: true
+    slide_level: 2
+    #highlight: pygments
+Email: andres.gutierrez@cepal.org
+lang: es
+editor_options:
+  markdown:
+    wrap: 90
+bibliography: CEPAL.bib
+---
+
+```{r setup, include=FALSE}
+library(printr)
+library(ggplot2)
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  cache = TRUE,
+  cache.path = "00_Caches/15_cap/"
+)
+ggplot2::theme_set(theme_bw())
+```
+
+# Introducción
+
+## ¿Por qué agregar encuestas?
+
+- Las encuestas de hogares suelen tener una frecuencia mensual o trimestral, pero los usuarios requieren _indicadores agregados_ (anuales, semestrales).
+
+- La agregación mejora la precisión estadística y permite el análisis de _subgrupos poblacionales_.
+
+- Sin embargo, esta práctica plantea retos técnicos, como:
+
+  - Duplicidad de unidades por esquemas rotativos.
+
+  - Corrección de pesos de diseño muestral.
+
+  - Estimación conjunta sin sesgos por repetición.
+
+
+
+## Fundamentos metodológicos
+
+- Desde los años 60 se proponen enfoques basados en:
+
+  - *Correlaciones temporales* entre periodos repetidos (@Gurney_Daly_1965).
+  
+  - *Estimadores compuestos* optimizados (@Lent_Miller_Duff_1999).
+  
+- Se reconocen riesgos de:
+
+  - Sesgos por error de medición (@Fuller_1990).
+  
+  - Desbalance muestral por rotación (@Bell_2001).
+
+\
+
+>La agregación requiere ajustes tanto en los estimadores de nivel como en los estimadores de cambio.
+
+
+
+## Retos y buenas prácticas
+
+- Considerar el efecto de la _rotación de paneles_:
+
+  - Determina varianzas y errores estándar.
+
+  - Afecta la independencia entre observaciones.
+
+- Incorporar procedimientos para:
+
+  - Combinar múltiples rondas sin inflar varianzas.
+
+  - Ajustar pesos y corregir por no respuesta o traslape.
+
+  - Aumentar potencia estadística en subgrupos (@Lewis_2017).
+
+- Diseño robusto + estimación adecuada = _Indicadores válidos y eficientes_
+
+## ¿Qué son los esquemas de acumulación?
+
+- Utilizados por oficinas estadísticas para incrementar precisión y lograr representatividad a nivel subnacional.
+
+- Consisten en agrupar levantamientos de encuestas (mensuales o trimestrales) para estimar indicadores agregados:
+
+  - Ejemplo.: crear un indicador anual a partir de 4 levantamientos trimestrales.
+
+- Estrategia útil especialmente en encuestas con diseño rotativo.
+
+\pause
+
+**Ideal para generar estimaciones provinciales o de subgrupos no representados en una sola ronda.**
+
+
+
+## Trimestres móviles y acumulación anual
+
+- Práctica común: usar trimestres móviles (últimos 3 meses) para publicar cifras mensuales de empleo.
+
+- Ventajas en diseños rotativos:
+
+  - Se mantiene el panel sin repetir vivienda en un mismo trimestre móvil.
+
+  - En acumulación anual sí se repiten viviendas → requiere atención estadística.
+
+- Ejemplo.: diseño 2(2)2 implica 50% de traslape entre muestras consecutivas.
+
+**La acumulación no es solo sumar bases: requiere estrategia de diseño y ponderación.**
+
+
+
+## Consideraciones técnicas y desafíos
+
+- Requiere codificación consistente de UPMs y estratos:
+
+  1. En paneles → mismas UPM deben tener mismo código.
+
+  2. En muestras independientes → codificar UPMs como distintas.
+
+- Estimar varianzas es complejo:
+
+  - Depende del patrón de traslape.
+
+  - Solución práctica: métodos de remuestreo (*Jackknife*, *Bootstrap*, *BRR*).
+
+- Referentes clave:
+
+  - @Korn_Graubard_1999 ponderación y diseño.
+
+  - @Train_Cahoon_Makens_1978: variabilidad en promedios acumulados.
+
+# Factores de expansión y estimadores de muestreo
+
+## Factores de expansión y estimadores de muestreo
+
+- Para estimar indicadores anuales, como la tasa de desempleo, en encuestas rotativas, es posible unir los datos de los cuatro trimestres del año.
+
+- Una solución inicial consiste en agregar las cuatro bases de datos y dividir los pesos por 4.
+
+- Esto produce estimadores puntuales aproximadamente insesgados.
+
+- Sin embargo, complica la estimación de errores estándar debido a la concatenación de UPMs.
+
+
+## Tipos de pesos en encuestas rotativas
+
+- Las encuestas rotativas requieren dos tipos de pesos:
+
+  - **Transversales**: aplicables a cada periodo individual (mes, trimestre, etc.).
+
+  - **Agregados**: ajustados para la combinación de varios periodos.
+
+- Los pesos transversales se usan para:
+
+  - Tasa de participación laboral.
+
+  - Tasa de pobreza.
+
+  - Tasa de desempleo.
+  
+
+
+## Estimador de razón: Tasa de desempleo
+
+- Se utiliza un estimador de razón:
+
+$$
+\hat\theta=\frac{\sum_s d_ky_k}{\sum_s d_kz_k}
+$$
+
+Donde:
+
+- $d_k$: peso de muestreo para la persona $k$
+
+- $y_k = 1$ si la persona está desempleada
+
+- $z_k = 1$ si la persona pertenece a la fuerza laboral
+
+
+
+## Variabilidad de los pesos transversales
+
+- Los pesos pueden cambiar entre periodos por:
+
+  - Selección de UPM y hogares
+
+  - Ajustes por no respuesta
+
+  - Cambios en población objetivo
+
+  - Calibración
+  
+- Por tanto, es común que:
+
+$$
+d_k^{t-1} \neq d_k^t
+$$
+
+- Esto exige cautela al construir pesos agregados para análisis acumulados.
+
+## Construcción de pesos agregados
+
+- Es necesario crear nuevos factores de expansión para soportar la inferencia en bases agregadas.
+
+- Cada peso en encuestas mensuales representa la cantidad de hogares que representa el hogar seleccionado.
+
+- Para mantener la coherencia poblacional, se ajustan los pesos de forma proporcional.
+
+## Agregación trimestral
+
+- Sea $d_{ik}$ el factor de expansión para el individuo $k$ en el mes $i$, con $i = 1, 2, 3$.
+
+- La estimación total trimestral se aproxima por:
+
+$$
+\hat{t}_y = \sum_{s_1 \cup s_2 \cup s_3} d_{k}^+ y_k
+\propto \sum_{s_1} d_{1k} y_k + \sum_{s_2} d_{2k} y_k + \sum_{s_3} d_{3k} y_k
+$$
+
+- El peso agregado se obtiene mediante:
+
+$$
+d_{ik}^+ = a_i \cdot d_{ik} ; \quad k \in s_i
+$$
+
+donde:
+
+$$
+a_i = \frac{\sum_{k \in s_i} d_{ik}}{\sum_{i=1}^3 \sum_{k \in s_i} d_{ik}}; \quad i = 1, 2, 3
+$$
+
+## Lectura de base de la encuesta 
+
+```{r, n_upms, echo=TRUE, warning=FALSE, error=FALSE, message=FALSE, eval=FALSE}
+library(haven)
+library(tidyverse)
+library(survey)
+library(srvyr)
+library(printr)
+encuesta_anual <- readRDS("Data/base_anual.rds")
+upm_mes <- encuesta_anual %>% distinct(trimestre, mes_trimestre, upm)
+
+upm_mes %>% group_by(trimestre, mes_trimestre) %>%
+  count(name = "n_upm") %>% 
+   pivot_wider(
+    names_from = mes_trimestre,
+    values_from = n_upm,
+    values_fill = 0  # Llena con 0 si falta alguna combinación
+  )  %>% mutate(Total = M1 + M2 + M3) %>%  data.frame()
+```
+
+
+## Tabla de conteo de UPM por mes y trimestre 
+
+```{r, n_upms, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, eval=TRUE}
+```
+
+ 
+```{r, echo=FALSE, eval=TRUE, tab.cap= "Conteo en el traslape"}
+traslape_trimestres <- upm_mes %>%
+  semi_join(upm_mes %>%
+              count(upm) %>%
+              filter(n > 1),
+            by = "upm") %>%
+  group_by(upm) %>%
+  summarise(trimestres = list(sort(unique(trimestre))),
+            .groups = "drop") %>%
+  filter(lengths(trimestres) > 1) %>%  
+  mutate(
+    pares_traslape = purrr::map(trimestres, ~ combn(.x, 2, simplify = FALSE))) %>%
+  select(upm, pares_traslape) %>%
+  unnest(pares_traslape) %>%
+  mutate(
+    trimestre_1 = map_chr(pares_traslape, 1),
+    trimestre_2 = map_chr(pares_traslape, 2)
+  ) %>%
+  count(trimestre_1, trimestre_2, name = "traslape") %>%
+  arrange(trimestre_1)
+
+traslape_trimestres
+
+```
+
+
+## Conteo de hogares por mes y trimestre
+
+```{r, n_hogar, echo=TRUE, warning=FALSE, error=FALSE, message=FALSE, eval=FALSE}
+hogar_mes <- encuesta_anual %>% 
+  distinct(trimestre, mes_trimestre, upm, id_hogar)
+
+hogar_mes %>% group_by(trimestre, mes_trimestre) %>%
+  count(name = "n_hogar") %>% 
+   pivot_wider(
+    names_from = mes_trimestre,
+    values_from = n_hogar,
+    values_fill = 0  
+  )  %>% mutate(Total = M1 + M2 + M3) %>% data.frame()
+```
+
+
+## Tabla de conteo de hogares por mes y trimestre 
+
+```{r, n_hogar, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, eval=TRUE}
+```
+
+
+## Conteo de personas por mes y trimestre
+
+```{r, n_pers, echo=TRUE, warning=FALSE, error=FALSE, message=FALSE, eval=FALSE}
+encuesta_anual %>% group_by(trimestre, mes_trimestre) %>%
+  count(name = "n_pers") %>% 
+   pivot_wider(
+    names_from = mes_trimestre,
+    values_from = n_pers,
+    values_fill = 0  
+  ) %>% mutate(Total = M1 + M2 + M3) %>% data.frame()
+```
+
+
+## Tabla de conteo de personas por mes y trimestre 
+
+```{r, n_pers, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, eval=TRUE}
+```
+
+## Factor de expansión ajustado por mes
+
+```{r,ponderador_mes , eval=FALSE, echo=TRUE}
+ponderador_mes <- encuesta_anual %>% 
+   group_by(trimestre, mes_trimestre) %>%
+  summarise(num = sum(fep), .groups = "drop") %>%
+  group_by(trimestre) %>% 
+  mutate(den = sum(num),
+         ai = num / den) 
+ponderador_mes %>% data.frame()
+
+encuesta_anual_ajus <- inner_join(encuesta_anual,
+           ponderador_mes %>% select(-num, -den),
+           by = c("trimestre", "mes_trimestre")) %>% 
+  mutate(dk_mes = fep*ai)
+```
+
+## Factor de expansión ajustado por mes  
+
+```{r,ponderador_mes , eval=TRUE, echo=FALSE}
+```
+
+## Total de hogares estimado por trimestre 
+
+```{r}
+encuesta_anual_ajus %>% 
+  filter(id_pers == "1") %>% group_by(trimestre) %>%
+  summarise(  tot_hog_dk = sum(dk_mes)) %>% data.frame()
+```
+
+## Total de hogares estimado por mes 
+
+```{r}
+encuesta_anual_ajus %>% 
+  filter(id_pers == "1") %>% group_by(trimestre, mes_trimestre) %>%
+  summarise(tot_hog_fep = sum(fep)) %>% data.frame()
+```
+
+
+## Total de personas estimado por trimestre 
+
+```{r}
+encuesta_anual_ajus %>% 
+ group_by(trimestre) %>%
+  summarise(  tot_pers_dk = sum(dk_mes)) %>% data.frame()
+```
+
+## Total de personas estimado por mes 
+
+```{r}
+encuesta_anual_ajus %>% 
+ group_by(trimestre, mes_trimestre) %>%
+  summarise(tot_pers_fep = sum(fep)) %>% data.frame()
+```
+
+
+## Total de personas estado de ocupación estimado por trimestre 
+
+```{r}
+encuesta_anual_ajus %>%
+  filter(!is.na(trabajo)) %>%
+  group_by(trimestre, trabajo) %>%
+  summarise(tot_empleo_dk = sum(dk_mes)) %>% 
+  pivot_wider(
+    names_from = trabajo,
+    values_from = tot_empleo_dk,
+    values_fill = 0  
+  ) %>% data.frame()
+```
+
+## Total de personas estado de ocupación estimado por trimestre 
+
+```{r}
+encuesta_anual_ajus %>%
+  filter(!is.na(trabajo)) %>%
+  mutate(
+    yk =  ifelse(trabajo == "Desocupado", 1, 0),
+    zk =  ifelse(trabajo != "Inactivo", 1, 0)
+  ) %>% group_by(trimestre) %>%
+  summarise(tot_yk = sum(dk_mes*yk),
+            tot_zk = sum(dk_mes*zk)) %>% 
+  mutate(theta = tot_yk/tot_zk)%>% data.frame()
+```
+
+
+## Agregación anual
+
+- Para 12 meses, la estimación se expresa como:
+
+$$
+\hat{t}_y = \sum_{s_1 \cup \cdots \cup s_{12}} d_k^+ y_k \propto \sum_{i=1}^{12} \sum_{s_i} d_{ik} y_k
+$$
+
+- Los pesos anuales ajustados se definen como:
+
+$$
+d_{ik}^+ = b_i \cdot d_{ik}; \quad k \in s_i
+$$
+
+donde:
+
+$$
+b_i = \frac{\sum_{k \in s_i} d_{ik}}{\sum_{i=1}^{12} \sum_{k \in s_i} d_{ik}}; \quad i = 1, \ldots, 12
+$$
+
+
+## Factor de expansión ajustado por año
+
+```{r,ponderador_anual , eval=FALSE, echo=TRUE}
+ponderador_anos <- encuesta_anual %>% 
+   group_by(trimestre, mes_trimestre) %>%
+  summarise(num = sum(fep), .groups = "drop") %>% 
+  mutate(den = sum(num),
+         bi = num / den) 
+ponderador_anos %>% data.frame()
+
+encuesta_anual_ajus2 <- inner_join(encuesta_anual,
+           ponderador_anos %>% select(-num, -den),
+           by = c("trimestre", "mes_trimestre")) %>% 
+  mutate(dk_anual = fep*bi)
+```
+
+## Factor de expansión ajustado de forma anual
+
+```{r,ponderador_anual , eval=TRUE, echo=FALSE}
+```
+
+## Total de hogares estimado anual
+
+```{r}
+encuesta_anual_ajus2 %>% ungroup() %>% 
+  filter(id_pers == "1") %>%
+  summarise(tot_hog_dk = sum(dk_anual)) %>% data.frame()
+```
+
+```{r}
+encuesta_anual_ajus2 %>% ungroup() %>% 
+  summarise(  tot_pers_dk = sum(dk_anual)) %>% data.frame()
+```
+
+## Total de personas estado de ocupación estimado de forma anual 
+
+```{r}
+encuesta_anual_ajus2 %>%
+  filter(!is.na(trabajo)) %>%
+  group_by(trabajo) %>%
+  summarise(tot_empleo_dk = sum(dk_anual)) %>% 
+  pivot_wider(
+    names_from = trabajo,
+    values_from = tot_empleo_dk,
+    values_fill = 0  
+  ) %>% data.frame()
+```
+
+## Total de personas estado de ocupación estimado de forma anual 
+
+```{r}
+encuesta_anual_ajus2 %>% ungroup() %>% 
+  filter(!is.na(trabajo)) %>%
+  mutate(
+    yk =  ifelse(trabajo == "Desocupado", 1, 0),
+    zk =  ifelse(trabajo != "Inactivo", 1, 0)
+  ) %>%
+  summarise(tot_yk = sum(dk_anual*yk),
+            tot_zk = sum(dk_anual*zk)) %>% 
+  mutate(theta = tot_yk/tot_zk)%>% data.frame()
+```
+
+
+
+
+## Coherencia de los nuevos factores
+
+- Los nuevos pesos deben sumar coherentemente a la población objetivo:
+
+**Trimestral**:
+$$
+\sum_{k \in s^3} d_{ik}^+ = \sum_{i=1}^{3} \sum_{k \in s_i} a_i d_{ik} \approx N
+$$
+
+**Anual**:
+$$
+\sum_{k \in s^{12}} d_{ik}^+ = \sum_{i=1}^{12} \sum_{k \in s_i} b_i d_{ik} \approx N
+$$
+
+
+
+## Recomendaciones prácticas
+
+- Verificar que las sumas de los pesos sean coherentes no solo a nivel nacional, sino también en:
+
+  - Ciudades principales
+
+  - Áreas urbano/rural
+ 
+  - Provincias
+ 
+  - Grupos de sexo, edad, etc.
+
+- Tras ajustar los pesos agregados, realizar una **recalibración** sobre las mismas variables utilizadas para calibrar los pesos mensuales.
+
+
+## Consideraciones de calibración
+
+- Ante la falta de proyecciones trimestrales o anuales, se puede:
+
+  - Usar el mes intermedio como referencia, o
+
+  - Promediar los totales poblacionales de los meses incluidos.
+
+- Este ajuste final en los pesos suele ser **mínimo** y **no altera significativamente** la estructura de los pesos originales ya calibrados.
+
+## Inclusión de todas las viviendas
+
+- Las bases agregadas deben incluir:
+
+  - Todas las viviendas encuestadas durante el periodo.
+
+  - Todas las mediciones de las viviendas que participaron en más de una ocasión, especialmente bajo esquemas rotativos.
+
+- La agregación **no distingue** entre viviendas con una o múltiples observaciones.
+
+## Esquema rotativo 2(2)2
+
+- Consideremos una encuesta mensual continua con esquema rotativo 2(2)2.
+
+- Si las muestras mensuales son independientes:
+
+  - Las agregaciones trimestrales **no incluirán viviendas repetidas**.
+
+  - Aún así, los pesos deben ajustarse en cada mes, **sin distinguir si hay repeticiones**.
+
+## Estimación del total trimestral
+
+El estimador del total trimestral se expresa como:
+
+$$
+\hat{t}_y = \sum_{s_1} d_{1k}^+ y_k + \sum_{s_2} d_{2k}^+ y_k + \sum_{s_3} d_{3k}^+ y_k = \hat{t}_{y}^1 + \hat{t}_{y}^2 + \hat{t}_{y}^3
+$$
+
+- Donde: $d_{ik}^+ = a_i \cdot d_{ik}$
+
+La varianza se calcula como suma de varianzas mensuales (muestreo independiente):
+
+$$
+Var(\hat{t}_y) = Var(\hat{t}_{y}^1) + Var(\hat{t}_{y}^2) + Var(\hat{t}_{y}^3)
+$$
+
+## Población para calibración trimestral 
+
+```{r, pob, echo=TRUE, eval=FALSE}
+library(openxlsx)
+poblacion <- read.xlsx("Imagenes/15_cap/muestra_anual.xlsx") %>%
+  transmute(estrato = paste0("hh_", dam, "_", area), 
+            N_hogares)
+poblacion
+```
+
+\tiny 
+```{r, pob, echo=FALSE, eval=TRUE}
+```
+
+## Modelo para calibración trimestral 
+
+```{r}
+total_pob <- setNames(round(poblacion$N_hogares),
+                      paste0(poblacion$estrato))
+
+formula_calb <-
+  as.formula(paste0("~ 0 + ", paste0(names(total_pob), 
+                                     collapse = " + ")))
+formula_calb
+
+```
+
+## Base de hogares por trimestre 
+
+```{r}
+base_hog <- encuesta_anual_ajus  %>%
+  filter(id_pers == 1) %>%
+  distinct(trimestre, mes_trimestre, estrato, dam, upm,
+           id_hogar, dk_mes) %>%
+  mutate(estrato_hh = estrato) %>%
+  fastDummies::dummy_columns(select_columns = "estrato_hh",
+                             remove_selected_columns = TRUE) %>%
+  rename_with(.fn = ~ gsub("^estrato_", "", .x),
+              .cols = starts_with("estrato_hh"))
+
+```
+
+## Definición del diseño muestral y calibración para el trimestre 1 
+
+```{r, echo=TRUE, eval=TRUE}
+df_T1 <-  base_hog %>% filter(trimestre == "T1")
+design_T1 <- svydesign(
+  id = ~ upm,
+  strata = ~ estrato,
+  weights = ~ dk_mes,
+  data = df_T1,
+  nest = TRUE
+)
+
+calibrado_T1 <-  calibrate(design = design_T1,
+                           formula = formula_calb,
+                           population = total_pob) %>% 
+  as_survey()
+
+```
+
+## Pesos calibrados por hogar para el trimestre 1 
+
+- Pesos antes de la calibración 
+```{r}
+summary(weights(design_T1))
+```
+
+- Pesos después de la calibración
+
+```{r}
+summary(weights(calibrado_T1))
+```
+
+## Definición del diseño muestral y calibración para el trimestre 2 
+
+```{r, echo=TRUE, eval=TRUE}
+df_T2 <-  base_hog %>% filter(trimestre == "T2")
+design_T2 <- svydesign(
+  id = ~ upm,
+  strata = ~ estrato,
+  weights = ~ dk_mes,
+  data = df_T2,
+  nest = TRUE
+)
+
+calibrado_T2 <-  calibrate(design = design_T2,
+                           formula = formula_calb,
+                           population = total_pob) %>% 
+  as_survey()
+
+```
+
+## Pesos calibrados por hogar para el trimestre 2 
+
+- Pesos antes de la calibración 
+```{r}
+summary(weights(design_T2))
+```
+
+- Pesos después de la calibración
+
+```{r}
+summary(weights(calibrado_T2))
+```
+
+
+## Pesos calibrados por hogar para el trimestre 3 
+
+```{r, echo=FALSE, eval=TRUE}
+df_T3 <-  base_hog %>% filter(trimestre == "T3")
+design_T3 <- svydesign(
+  id = ~ upm,
+  strata = ~ estrato,
+  weights = ~ dk_mes,
+  data = df_T3,
+  nest = TRUE
+)
+
+calibrado_T3 <-  calibrate(design = design_T3,
+                           formula = formula_calb,
+                           population = total_pob) %>% 
+  as_survey()
+
+df_T4 <-  base_hog %>% filter(trimestre == "T4")
+design_T4 <- svydesign(
+  id = ~ upm,
+  strata = ~ estrato,
+  weights = ~ dk_mes,
+  data = df_T4,
+  nest = TRUE
+)
+
+calibrado_T4 <-  calibrate(design = design_T4,
+                           formula = formula_calb,
+                           population = total_pob) %>% 
+  as_survey()
+
+```
+
+- Pesos antes de la calibración 
+```{r}
+summary(weights(design_T3))
+```
+
+- Pesos después de la calibración
+
+```{r}
+summary(weights(calibrado_T3))
+```
+
+## Pesos calibrados por hogar para el trimestre 4 
+
+
+- Pesos antes de la calibración 
+```{r}
+summary(weights(design_T4))
+```
+
+- Pesos después de la calibración
+
+```{r}
+summary(weights(calibrado_T4))
+```
+
+## Base de hogares con los pesos calibrados 
+
+```{r}
+base_hog_calib <-
+bind_rows(
+design_T1$variables %>%
+  transmute(trimestre, mes_trimestre, upm,id_hogar,
+            dk_mes_cali = weights(calibrado_T1) ), 
+design_T2$variables %>%
+  transmute(trimestre, mes_trimestre, upm, id_hogar,
+            dk_mes_cali = weights(calibrado_T2) ) ,
+design_T3$variables %>%
+  transmute(trimestre, mes_trimestre, upm, id_hogar,
+            dk_mes_cali = weights(calibrado_T3) ), 
+design_T4$variables %>%
+  transmute(trimestre, mes_trimestre, upm,id_hogar,
+            dk_mes_cali = weights(calibrado_T4) ) 
+)
+```
+
+## Base de personas con los pesos calibrados 
+
+```{r}
+encuesta_anual_ajus_calib <- 
+  inner_join(encuesta_anual_ajus, base_hog_calib)
+
+design_T1_calib <- svydesign(
+  id = ~ upm,
+  strata = ~ estrato,
+  weights = ~ dk_mes_cali,
+  data = encuesta_anual_ajus_calib %>% 
+    filter(trimestre == "T1"),
+  nest = TRUE
+) %>% as_survey()
+
+```
+
+## Estimación del total de personas en el trimestre 1
+
+```{r}
+total_mes <- design_T1_calib %>% group_by(mes_trimestre) %>%
+  summarise(total_estimado = survey_total(vartype = "var"),
+            .groups = "drop")
+total_mes
+
+total_mes %>%   summarise(
+  total_estimado_trim = sum(total_estimado),
+  total_estimado_var_trim = sqrt(sum(total_estimado_var))
+)
+```
+## Estimación del total de personas dado el estado de ocupación por mes
+
+```{r}
+total_mes_empleo <- design_T1_calib %>%
+  filter(!is.na(trabajo)) %>% 
+  group_by(mes_trimestre, trabajo ) %>%
+  summarise(total_estimado = survey_total(vartype = "var"),
+            .groups = "drop")
+total_mes_empleo
+```
+
+## Estimación del total de personas dado el estado de ocupación por trimestre
+
+```{r}
+total_mes_empleo %>% group_by(trabajo ) %>%   summarise(
+  total_estimado_trim = sum(total_estimado),
+  total_estimado_var_trim = sqrt(sum(total_estimado_var))
+)
+```
+
+
+
+
+
+## Estimación del total anual
+
+El estimador del total anual es:
+
+$$
+\hat{t}_y = \sum_{i=1}^{12}\sum_{s_i} d_{ik}^+ y_k = \sum_{i=1}^{12} \hat{t}_{y}^i
+$$
+
+- Donde: $d_{ik}^+ = b_i \cdot d_{ik}$
+
+La varianza considera dependencia entre meses (UPM compartidas):
+
+$$
+Var(\hat{t}_y) = \sum_{i=1}^{12} Var(\hat{t}_{y}^i) + 2 \sum_{i,j=1}^{12} \sum_{j < i} Cov(\hat{t}_{y}^i, \hat{t}_{y}^j)
+$$
+
+## Implicaciones
+
+- En agregación anual, no se puede asumir independencia mensual.
+
+- Las covarianzas entre estimadores mensuales **no pueden ignorarse** debido al diseño rotativo.
+
+# Agregación de encuestas con diferentes tamaños de muestra
+
+## Agregación de encuestas con diferentes tamaños de muestra
+
+- Las encuestas pueden tener **variaciones mensuales** importantes en el tamaño de muestra.
+
+- Eventos externos (como la pandemia por COVID-19) pueden reducir drásticamente la cobertura en ciertos periodos.
+
+- Aun cuando se recolectan datos cada mes, la representatividad no siempre es equivalente mes a mes.
+
+- El ajuste correcto de los **factores de expansión** es esencial cuando se agregan los datos trimestralmente.
+
+## Ejemplo de esquema trimestral
+
+| Panel / Mes | M1   | M2   | M3   |
+|-------------|------|------|------|
+| Panel       | P1   | P2   | P3   |
+| Viviendas   | 5000 | 4500 | 2500 |
+| Panel       | P4   | P5   | P6   |
+| Viviendas   | 5500 | 5100 | 3000 |
+
+- Mes 1: Se usan P1 y P4  
+- Mes 2: Se usan P2 y P5  
+- Mes 3: Se usan P3 y P6 (menor tamaño muestral)
+
+## Consideraciones clave
+
+- La agregación no debe hacerse simplemente uniendo las bases.
+
+- Se deben tener en cuenta **las diferencias en representatividad** y ajustar los pesos.
+
+- El objetivo es preservar la representatividad trimestral sin **sobreponderar** observaciones con menor cobertura.
+
+
+## Agregación con encuestas de tamaños muestrales desiguales
+
+- Cuando el tamaño muestral varía entre periodos, como en el tercer mes del ejemplo anterior, es necesario **ajustar los pesos de muestreo** para evitar sesgos en los estimadores agregados.
+
+- @Heeringa_West_Berglund_2017 proponen que, frente a tamaños reducidos de muestra, se pueden **normalizar los factores de expansión** mediante un ajuste proporcional, tal como fue sugerido por @Kish_1999.
+
+## Ajuste ponderado
+
+El peso ajustado se define como:
+
+$$
+d_{kth}^{+} = \delta_{th} \times d_{kth}
+$$
+
+- $d_{kth}$: factor de expansión del individuo $k$, en el estrato $h$, durante el mes $t$.
+
+- $\delta_{th}$: proporción del tamaño de muestra del mes $t$ en el estrato $h$ con respecto al total del trimestre:
+
+$$
+\delta_{th} = \frac{n_{th}}{\sum_{t = 1}^3 n_{th}}
+$$
+
+## Interpretación de $\delta_{th}$
+
+- Este ajuste pondera la contribución mensual de cada estrato al total trimestral.
+
+- Puede entenderse como un factor de **promedio ponderado**, que define la combinación lineal convexa entre los pesos.
+
+
+## Propiedades de los pesos ajustados trimestrales
+
+1. **Combinación lineal convexa**  
+   $\delta_{th} > 0$ para todo $t$ y $h$, y  
+   $\sum_{t=1}^3 \delta_{th} = 1$
+
+2. **Consistencia con los tamaños poblacionales estimados por dominio**  
+   Asumiendo que $s_h$ es la muestra del estrato $h$ durante los tres meses:
+
+   $$
+   \sum_{t=1}^3 \sum_{k\in s_h} d_{kth}^{+}
+   = \sum_{t=1}^3 \delta_{th} \hat{N}_h^t
+   \approx \hat{N}_h
+   $$
+
+## Propiedades de los pesos ajustados trimestrales
+
+3. **Aporte proporcional al tamaño de muestra mensual**  
+   La suma de los factores trimestrales dentro de un dominio $h$ para el mes $t$ es:
+
+   $$
+   \sum_{k \in s_{th}} d_{kth}^{+}
+   = \delta_{th} \hat{N}_h^t
+   $$
+
+4. **Promediación equivalente en los estratos**  
+   El mecanismo permite representar correctamente la contribución de cada mes incluso en contextos con muestras reducidas.
+
+
+- Este procedimiento permite mantener la representatividad estadística aún bajo condiciones de desbalance temporal en los tamaños muestrales, con mínimos supuestos adicionales y una estructura bien definida de ponderación.
+
+
+## Comprobación de la estabilidad de los factores trimestrales
+
+Una propiedad importante del esquema de ponderación trimestral es que el aporte de los factores de expansión ponderados ($d_{kth}^{+}$) debe ser proporcional al tamaño muestral en cada dominio y cada mes.
+
+Además, se espera que la media de los factores trimestrales sea aproximadamente constante en el tiempo dentro de cada dominio específico. Esto puede expresarse matemáticamente como:
+
+$$
+\frac{\sum_{k\in s_{th}} d_{kth}^{+}}{n_{h}}
+=\frac{\sum_{k\in s_{th}} \delta_{th} d_{kth}}{n_{h}}
+=\frac{\sum_{k\in s_{th}} d_{kth}}{\sum_h n_h}
+=\frac{\hat{N}_{th}}{\sum_h n_h}
+\cong \frac{\hat{N}_{h}}{\sum_h n_h}
+$$
+
+## Comprobación de la estabilidad de los factores trimestrales (Nacianal)
+
+```{r,tab_val1, echo=TRUE, eval=FALSE}
+encuesta_anual_ajus_calib %>% 
+  group_by(trimestre, mes_trimestre) %>% 
+  summarise(n_obs = n(), N_hat = sum(dk_mes_cali )) %>% 
+ transmute(trimestre, mes_trimestre, prop = N_hat /n_obs ) %>% 
+  pivot_wider(
+    names_from = mes_trimestre,
+    values_from = prop,
+    values_fill = 0  
+  ) %>% data.frame()
+```
+
+## Tabla de comprobación de la estabilidad de los factores trimestrales (Nacianal)
+
+```{r,tab_val1, echo=FALSE, eval=TRUE}
+```
+
+
+## Comprobación de la estabilidad de los factores trimestrales (Sexo)
+
+```{r,tab_val2, echo=TRUE, eval=FALSE}
+encuesta_anual_ajus_calib %>% 
+  group_by(trimestre, mes_trimestre, sexo) %>% 
+  summarise(n_obs = n(), N_hat = sum(dk_mes_cali )) %>% 
+ transmute(trimestre, mes_trimestre, sexo,
+           prop = N_hat /n_obs ) %>% 
+  pivot_wider(
+    names_from = mes_trimestre,
+    values_from = prop,
+    values_fill = 0  
+  ) %>% data.frame()
+```
+
+## Tabla de comprobación de la estabilidad de los factores trimestrales (Sexo)
+
+```{r,tab_val2, echo=FALSE, eval=TRUE}
+```
+
+
+## Comprobación de la estabilidad de los factores trimestrales (Empleo)
+
+```{r,tab_val3, echo=TRUE, eval=FALSE}
+encuesta_anual_ajus_calib %>% 
+  group_by(trimestre, mes_trimestre, trabajo) %>% 
+  summarise(n_obs = n(), N_hat = sum(dk_mes_cali )) %>% 
+ transmute(trimestre, mes_trimestre, trabajo,
+           prop = N_hat /n_obs ) %>% 
+  pivot_wider(
+    names_from = trabajo,
+    values_from = prop,
+    values_fill = 0  
+  ) %>% data.frame()
+```
+
+## Tabla de comprobación de la estabilidad de los factores trimestrales (Empleo)
+
+```{r,tab_val3, echo=FALSE, eval=TRUE}
+```
+
+
+## Comprobación de la estabilidad de los factores trimestrales (Área - Sexo)
+
+```{r,tab_val4, echo=TRUE, eval=FALSE}
+encuesta_anual_ajus_calib %>% 
+  group_by(trimestre, mes_trimestre, area, sexo) %>% 
+  summarise(n_obs = n(), N_hat = sum(dk_mes_cali )) %>% 
+ transmute(trimestre, area, mes_trimestre, sexo,
+           prop = N_hat /n_obs ) %>% 
+  pivot_wider(
+    names_from = mes_trimestre,
+    values_from = prop,
+    values_fill = 0  
+  ) %>% data.frame()
+```
+
+## Tabla de comprobación de la estabilidad de los factores trimestrales (Área - Sexo)
+
+\small
+
+```{r,tab_val4, echo=FALSE, eval=TRUE}
+```
+
+
+## Comprobación de la estabilidad de los factores trimestrales
+
+Esto implica que, **sin importar el mes**, la media de los factores trimestrales será similar dentro de cada dominio. Este comportamiento favorece la agregación, dado que el **peso del mes con mayor tamaño de muestra influye más en el estimador agregado**, manteniendo coherencia en la estructura de ponderación.
+
+Por tanto, para dominios con amplia muestra, como las cinco ciudades principales, la agregación trimestral tiende a producir estimaciones cercanas al promedio de los valores mensuales.
+
+## Extensión a la agregación anual
+
+La metodología puede extenderse a la agregación de 12 meses. Para ello, se recomienda ajustar los pesos originales $d_{kth}$ mediante un factor de normalización definido como:
+
+$$
+d_{kth}^{+} = \delta_{th} \cdot d_{kth}
+$$
+
+donde $\delta_{th}$ representa el **porcentaje de individuos observados en el mes $t$ para el estrato $h$**, calculado como:
+
+$$
+\delta_{th} = \frac{n_{th}}{\sum_{t = 1}^{12} n_{th}}
+$$
+
+Este esquema conserva la proporcionalidad del aporte muestral en la estimación agregada anual.
+
+# Efecto del tipo de encuesta en la eficiencia de los indicadores
+
+## Efecto del tipo de encuesta en la eficiencia de los indicadores
+
+Lograr una estimación adecuada del error de muestreo en comparaciones de múltiples periodos, con o sin agregación, es una tarea clave del investigador. Según el tipo de parámetro, la naturaleza del error cambia, así como el tamaño de muestra requerido. A continuación se ilustra esto con el caso de los **cambios netos**.
+
+## Cambios netos
+
+Considere el cambio neto en la media de una variable de interés $y$ entre dos periodos, $t_2$ y $t_1$:
+
+$$
+\Delta = \bar{y}_2 - \bar{y}_1
+$$
+
+Este parámetro se estima de forma aproximadamente insesgada como:
+
+$$
+\hat{\Delta} = 
+\hat{\bar{y}}_2 - \hat{\bar{y}}_1
+= \frac{\sum_{k\in s_2}\frac{y_{k}}{\pi_k}}{\sum_{k\in s_2}\frac{1}{\pi_k}} - \frac{\sum_{k\in s_1}\frac{y_{k}}{\pi_k}}{\sum_{k\in s_1}\frac{1}{\pi_k}}
+$$
+
+donde $s_1$ y $s_2$ son las muestras seleccionadas en los dos periodos, y $\pi_k$ es la probabilidad de inclusión del individuo $k$.
+
+## Cambios netos
+
+La varianza de este estimador está dada por:
+
+$$
+Var(\hat{\Delta}) = Var(\hat{\bar{y}}_2) + Var(\hat{\bar{y}}_1) - 2Cov(\hat{\bar{y}}_2, \hat{\bar{y}}_1)
+$$
+
+La covarianza puede expresarse como:
+
+$$
+2Cov(\hat{\bar{y}}_2, \hat{\bar{y}}_1) = 
+2\sqrt{Var(\hat{\bar{y}}_2)}\sqrt{Var(\hat{\bar{y}}_1)}\sqrt{T_2}\sqrt{T_1}R_{12}
+$$
+
+donde $T_1$ y $T_2$ son los porcentajes de muestra común entre periodos, y $R_{12}$ es la correlación de la variable $x$ en los dos levantamientos.
+
+## Cambios netos
+
+Asumiendo varianzas iguales $Var(\hat{\bar{y}}_1) = Var(\hat{\bar{y}}_2) = Var(\hat{\bar{y}})$ y traslape común $T_1 = T_2 = T$, la varianza se simplifica:
+
+$$
+Var(\hat{\Delta}) = 2Var(\hat{\bar{y}})(1 - TR_{12})
+$$
+
+## Estimación del cambio neto del ingreso. 
+
+
+```{r}
+design_T1_T2_calib <- svydesign(
+  id = ~ upm,
+  strata = ~ estrato, weights = ~ dk_mes_cali,
+  data = encuesta_anual_ajus_calib %>% 
+    filter(trimestre %in% c("T2", "T1")),
+  nest = TRUE ) %>% as_survey()
+
+(media_ingresos <- svyby(~ingreso, ~trimestre,
+                        design = design_T1_T2_calib,
+                        svymean, vartype = "var",
+                        covmat = TRUE))
+
+
+
+```
+
+## Estimación de la  cambio $\Delta = \bar{y}_2 - \bar{y}_1$ ingreso. 
+
+```{r}
+(vcov_mat <- attr(media_ingresos, "var"))
+
+(delta <- svycontrast(media_ingresos, 
+                     quote(`T2` - `T1`)))
+```
+
+
+
+
+## Impacto del tipo de encuesta
+
+Según @Kish_2004, la varianza del estimador de cambio varía según el diseño:
+
+- **Encuesta repetida** ($T = 0$):
+
+  $$
+  Var(\hat{\Delta}) = 2Var(\hat{\bar{y}})
+  $$
+
+- **Encuesta de panel** ($T = 1$, $R_{12} > 0$):
+
+  $$
+  Var(\hat{\Delta}) = 2Var(\hat{\bar{y}})(1 - R_{12})
+  $$
+
+- **Encuesta rotativa** ($T \neq 0$, $R_{12} > 0$):
+
+  $$
+  Var(\hat{\Delta}) = 2Var(\hat{\bar{y}})(1 - TR_{12})
+  $$
+
+Si $R_{12} > 0$, se cumple:
+
+$$
+2Var(\hat{\bar{y}})(1 - R_{12}) < 
+2Var(\hat{\bar{y}})(1 - TR_{12}) <
+2Var(\hat{\bar{y}})
+$$
+
+## Observación
+
+El diseño de panel requiere un tamaño de muestra **menor** para estimar cambios netos, en comparación con una encuesta repetida sin traslape. El diseño rotativo representa un punto intermedio en eficiencia.
+
+## Promedio trimestral
+
+Suponga que se desea estimar el promedio trimestral de la variable de interés $y$, a partir de una encuesta continua mensual para tres periodos: $t_3$, $t_2$ y $t_1$:
+
+$$
+\Theta = \frac{\bar{y}_3 + \bar{y}_2 + \bar{y}_1}{3}
+$$
+
+Un estimador insesgado de este parámetro es:
+
+$$
+\hat{\Theta} = \frac{1}{3} \left( \hat{\bar{y}}_3 + \hat{\bar{y}}_2 + \hat{\bar{y}}_1 \right)
+= \frac{1}{3}\left( \frac{\sum_{k\in s_3}\frac{y_k}{\pi_k}}{\sum_{k\in s_3}\frac{1}{\pi_k}} + \frac{\sum_{k\in s_2}\frac{y_k}{\pi_k}}{\sum_{k\in s_2}\frac{1}{\pi_k}} + \frac{\sum_{k\in s_1}\frac{y_k}{\pi_k}}{\sum_{k\in s_1}\frac{1}{\pi_k}} \right)
+$$
+
+donde $s_1$, $s_2$ y $s_3$ son las muestras correspondientes a cada mes, y $\pi_k$ la probabilidad de inclusión del elemento $k$.
+
+##  Varianza del estimador
+
+La varianza del estimador está dada por:
+
+$$
+\begin{split}
+Var(\hat{\Theta}) & = \frac{1}{9}\left[Var(\hat{\bar{y}}_3) + Var(\hat{\bar{y}}_2) + Var(\hat{\bar{y}}_1) \right. + \\
+& \left. 2Cov(\hat{\bar{y}}_3, \hat{\bar{y}}_2) + 2Cov(\hat{\bar{y}}_3, \hat{\bar{y}}_1) + 2Cov(\hat{\bar{y}}_2, \hat{\bar{y}}_1) \right]
+\end{split}
+$$
+
+Asumiendo varianzas homogéneas y traslape común por diseño, además de errores débilmente estacionarios, se simplifica a:
+
+$$
+Var(\hat{\Theta}) = \frac{1}{9} Var(\hat{\bar{y}})[3 + 6TR]
+$$
+
+donde $R$ es la correlación constante entre las estimaciones en diferentes meses y $T$ es el porcentaje de traslape de muestra entre meses.
+
+## Estimación del promedio para 3 trimestre
+
+```{r, tab_Tres_trim, eval=FALSE, echo=TRUE}
+design_T1_T2_T3_calib <- svydesign(
+  id = ~ upm,
+  strata = ~ estrato,
+  weights = ~ dk_mes_cali,
+  data = encuesta_anual_ajus_calib %>%
+    filter(trimestre %in% c("T2", "T1", "T3")),
+  nest = TRUE
+) %>% as_survey()
+
+(
+  media_ingresos <- svyby(
+    ~ ingreso,
+    ~ trimestre,
+    design = design_T1_T2_T3_calib,
+    svymean,
+    vartype = "var",
+    covmat = TRUE
+  )
+)
+```
+
+## Tabla de estimación del promedio para 3 trimestre
+
+
+```{r, tab_Tres_trim, eval=TRUE, echo=FALSE}
+```
+
+```{r}
+(media_trimestral <- mean(media_ingresos$ingreso))
+
+vcov(media_ingresos)
+```
+
+## Tabla de estimación del promedio para 3 trimestre
+
+```{r}
+(delta <- svycontrast(media_ingresos, 
+                     quote((`T1` + `T2`+ `T3`)/3)))
+```
+
+
+## Impacto del tipo de encuesta
+
+Según el diseño muestral, la varianza cambia:
+
+- **Encuesta repetida** ($T = 0$):
+  
+  $$
+  Var(\hat{\Theta}) = \frac{1}{3} Var(\hat{\bar{y}})
+  $$
+
+- **Encuesta de panel** ($T = 1$, $R > 0$):
+
+  $$
+  Var(\hat{\Theta}) = \frac{1}{9} Var(\hat{\bar{y}}) [3 + 6R]
+  $$
+
+- **Encuesta rotativa** ($T \neq 0$, $R > 0$):
+
+  $$
+  Var(\hat{\Theta}) = \frac{1}{9} Var(\hat{\bar{y}}) [3 + 6TR]
+  $$
+
+## Observación
+
+Si $R > 0$, se cumple:
+
+$$
+\frac{1}{9} Var(\hat{\bar{y}}) [3 + 6R] > 
+\frac{1}{9} Var(\hat{\bar{y}}) [3 + 6TR] > 
+\frac{1}{3} Var(\hat{\bar{y}})
+$$
+
+Lo anterior indica que un diseño de **panel requiere mayor tamaño de muestra** para promedios trimestrales que una encuesta repetida. El diseño rotativo es una alternativa intermedia.
+
+
+# Pruebas de hipótesis sobre indicadores agregados
+
+## Pruebas de hipótesis sobre indicadores agregados
+
+Para evaluar si un cambio en el parámetro de interés entre dos periodos es significativo, se plantea una prueba de hipótesis. Por ejemplo, se puede evaluar si la tasa de desocupación ha disminuido entre dos trimestres o años consecutivos.
+
+En comparaciones entre grupos en un mismo corte transversal (e.g., hombres vs. mujeres), debe tenerse en cuenta que el muestreo se realiza a nivel de UPM, y que los tamaños muestrales por grupo pueden variar aleatoriamente. Para comparaciones entre periodos (e.g., dos trimestres), es clave considerar la dependencia inducida por diseños de panel rotativo.
+
+## sistema de hipótesis
+El sistema de hipótesis es:
+
+$$
+H_0: \theta_2 - \theta_1 = 0 \quad \text{vs.} \quad H_1: \theta_2 - \theta_1 \neq 0
+$$
+
+El estimador de diferencia es:
+
+$$
+\hat{\Delta} = \hat{\theta}_2 - \hat{\theta}_1
+$$
+
+## Varianza del estimador 
+
+La varianza de este estimador se expresa como:
+
+$$
+Var(\hat{\Delta}) = Var(\hat{\theta}_2) + Var(\hat{\theta}_1) - 2 Cov(\hat{\theta}_1, \hat{\theta}_2)
+$$
+
+Donde el término de covarianza está dado por:
+
+$$
+Cov(\hat{\theta}_1, \hat{\theta}_2) = \sqrt{Var(\hat{\theta}_1)} \sqrt{Var(\hat{\theta}_2)} \sqrt{T_1} \sqrt{T_2} R_{12}
+$$
+
+- *Salvo que los dos estimadores se construyan sobre subconjuntos disjuntos de UPM, el término de covarianza no será nulo.*
+
+## Escenarios comunes
+
+1. **Muestreo independiente entre periodos**:  
+   $T_1 = T_2 = 0 \Rightarrow Cov(\hat{\theta}_1, \hat{\theta}_2) = 0$  
+   (e.g., meses sin traslape).
+
+2. **Panel rotativo 2(2)2**:  
+   $T_1 = T_2 \approx 0.5$ y $R_{12} \neq 0$  
+   $$
+   Cov(\hat{\theta}_1, \hat{\theta}_2) = \frac{1}{2} \sqrt{Var(\hat{\theta}_1)} \sqrt{Var(\hat{\theta}_2)} R_{12}
+   $$
+
+## Escenarios comunes
+
+3. **Comparaciones entre subgrupos en un mismo mes**:  
+   - **Sin independencia (e.g., hombres vs. mujeres)**:  
+     $T_1 \neq T_2$, $R_{12} \neq 0$
+
+     $$
+     Cov(\hat{\theta}_1, \hat{\theta}_2) = \sqrt{Var(\hat{\theta}_1)} \sqrt{Var(\hat{\theta}_2)} \sqrt{T_1} \sqrt{T_2} R_{12}
+     $$
+
+   - **Con independencia (e.g., ciudades diferentes)**:  
+     $R_{12} = 0 \Rightarrow Cov(\hat{\theta}_1, \hat{\theta}_2) = 0$
+
+## Estadístico de prueba
+
+Una vez conocida la varianza del estimador, se construye el estadístico:
+
+$$
+t = \frac{\hat{\Delta}}{\sqrt{Var(\hat{\Delta})}}
+$$
+
+Este estadístico se distribuye como *t-Student* con $gl$ grados de libertad, dados por:
+
+$$
+gl = \sum_{h=1}^H (n_{Ih} - 1) = \#UPM - \#Estratos
+$$
+
+## Estadístico de prueba
+
+El número de grados de libertad es clave para la inferencia. Por ejemplo:
+
+- $t_{0.975, 1}=12.7$
+- $t_{0.975, 20}=2.08$
+- $t_{0.975, 40}=2.02$
+- $t_{0.975, \infty}=1.96$
+
+En el caso de subpoblaciones, los grados de libertad se ajustan como:
+
+$$
+gl_{subpoblación} = \sum_{h=1}^H v_h(n_{Ih} - 1)
+$$
+
+donde $v_h = 1$ si el estrato $h$ contiene observaciones de la subpoblación de interés, y $0$ en otro caso.
+
+## Prueba de hipótesis $\hat{\Delta} = \bar{y}_{T=2} - \bar{y}_{T=1}$
+
+```{r}
+resultado_ttest <- svyttest(ingreso ~ trimestre, 
+                            design = design_T1_T2_calib)
+resultado_ttest
+```
+
+
+## ¡Gracias!
+
+::: yellow
+*Email*: [andres.gutierrez\@cepal.org](mailto:andres.gutierrez@cepal.org){.email}
+:::
+
+
+## Referencias
