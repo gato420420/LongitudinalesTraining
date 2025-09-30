@@ -138,7 +138,7 @@ encuesta_anual_ajus %>%
 
 encuesta_anual_ajus %>% 
  group_by(trimestre) %>%
-  summarise(  tot_pers_dk = sum(dk_mes)) %>% data.frame()
+  summarise(tot_pers_dk = sum(dk_mes)) %>% data.frame()
 
 # Total de personas estimado por mes 
 
