@@ -91,12 +91,24 @@ base_t1_t2 <- base_t1_t2 %>%
   mutate(fep_long = ifelse(respboth == 1, fep_t1/prob_panel, 0))
 
 # Verificar suma de pesos
-sum(base_t1_t2$fep_long)
+sum(base_t1_t2$fep_long) ## Total hogares
+
+base_t1_t2 %>% 
+  inner_join(base_personas %>%
+               select(trimestre, id_hogar, id_pers)) %>%
+  summarise(pob_estimada = sum(fep_long))
+
 
 # Comparar con población estimada por trimestre
 base_personas %>% 
+  distinct(trimestre, id_hogar, fep) %>% 
+  group_by(trimestre) %>%  
+  summarise(Hog_estimada = sum(fep))
+
+base_personas %>% 
   group_by(trimestre) %>%  
   summarise(pob_estimada = sum(fep))
+
 
 # =============================================
 # 6. IDENTIFICACIÓN DE PERSONAS EN AMBOS TRIMESTRES
@@ -132,7 +144,7 @@ base_personas_t1_t2 <- base_personas_t1_t2 %>%
 modelo_logit <- glm(respboth_per ~ sexo + ingreso,
                     data = base_personas_t1_t2,
                     family = binomial(link = "logit"))
-
+summary(modelo_logit)
 # 7.2 Predecir probabilidades de respuesta
 base_personas_t1_t2$prob_resp <- predict(modelo_logit, type = "response")
 
@@ -145,13 +157,16 @@ plot(roc_obj, main = paste("Curva ROC - AUC:", round(auc(roc_obj), 3)))
 base_personas_t1_t2 <- base_personas_t1_t2 %>%  
   mutate(fep_aj = fep_long / prob_resp)
 
+head(base_personas_t1_t2 %>% 
+       select(id_hogar, id_pers ,
+              trimestre, fep_long,
+              fep_aj))
 # =============================================
 # 8. PREPARACIÓN PARA ANÁLISIS LONGITUDINAL
 # =============================================
 
-poblacion <- read.xlsx("Imagenes/15_cap/muestra_anual.xlsx") %>%
-  transmute(estrato = paste0("pp_", dam, "_", area), 
-            N_personas )
+poblacion <- openxlsx::read.xlsx("Imagenes/15_cap/muestra_anual.xlsx") %>%
+  transmute(estrato = paste0("pp_", dam, "_", area), N_personas)
 
 # 8.1 Definir totales poblacionales conocidos para calibración
 total_pob <- setNames(round(poblacion$N_personas),
@@ -172,6 +187,7 @@ temp_pobreza <- base_personas_ambos %>%
   pivot_wider(names_from = trimestre, values_from = pobreza) %>%
   rename(pobreza_t1 = 'T1', pobreza_t2 = 'T2')
 
+table(temp_pobreza$pobreza_t1, temp_pobreza$pobreza_t2)
 
 temp  <- temp %>% mutate(estrato_pp = estrato) %>%
   fastDummies::dummy_columns(select_columns = "estrato_pp",
