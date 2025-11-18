@@ -489,7 +489,26 @@ Para construir una base de datos longitudinal consistente, es necesario identifi
 base_personas_t1_t2 <- base_personas %>% 
   filter(id_hogar %in% hogares_ambos) %>% 
   mutate(id_llave = paste0(id_hogar, id_pers))
+```
 
+```{r, echo=FALSE}
+set.seed(15)
+
+
+base_T2 <-   base_personas_t1_t2 %>% filter(trimestre == "T2") %>% 
+    mutate(pobreza = ifelse(0.2 > runif(n()), NA, pobreza) )
+
+base_T1 <- base_personas_t1_t2 %>% filter(trimestre == "T1") %>% 
+    mutate(pobreza = ifelse(0.1 > runif(n()), NA, pobreza) )
+
+
+base_personas_t1_t2 <- bind_rows(base_T1, base_T2)
+
+
+```
+
+
+```{r, echo=TRUE}
 hogares_personas <- base_personas_t1_t2 %>% 
   group_by(id_llave) %>%   count() %>%
   filter(n == 2) %>% pull(id_llave)

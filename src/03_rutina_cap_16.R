@@ -119,6 +119,22 @@ base_personas_t1_t2 <- base_personas %>%
   filter(id_hogar %in% hogares_ambos) %>%
   mutate(id_llave = paste0(id_hogar, id_pers))
 
+set.seed(15)
+
+
+base_T2 <-   base_personas_t1_t2 %>% filter(trimestre == "T2") %>% 
+    mutate(pobreza = ifelse(0.2 > runif(n()), NA, pobreza) )
+
+table(base_T2$pobreza, useNA = "a")
+  
+base_T1 <- base_personas_t1_t2 %>% filter(trimestre == "T1") %>% 
+    mutate(pobreza = ifelse(0.1 > runif(n()), NA, pobreza) )
+
+table(base_T1$pobreza, useNA = "a")
+
+base_personas_t1_t2 <- bind_rows(base_T1, base_T2)
+
+table(base_personas_t1_t2$pobreza, base_personas_t1_t2$trimestre, useNA = "a"  )
 # 6.2 Identificar personas con respuesta en ambos trimestres
 hogares_personas <- base_personas_t1_t2 %>%
   group_by(id_llave) %>% 
@@ -130,11 +146,14 @@ hogares_personas <- base_personas_t1_t2 %>%
 base_personas_t1_t2 <- base_personas_t1_t2 %>%
   mutate(respboth_per = if_else(id_llave %in% hogares_personas, 1, 0))
 
+
 # 6.4 Unir con información de hogares
 base_personas_t1_t2 <- base_personas_t1_t2 %>%
   inner_join(base_t1_t2 %>%
                select(id_hogar, fep_long, trimestre),
              by = c("id_hogar","trimestre"))
+
+table(base_personas_t1_t2$respboth_per)
 
 # =============================================
 # 7. AJUSTE POR NO RESPUESTA
@@ -176,6 +195,8 @@ fomula_calb <-
   as.formula(paste0("~ 0 + ", paste0(names(total_pob), collapse = " + ")))
 fomula_calb
 
+
+
 # 8.2 Organizar base longitudinal
 base_personas_ambos <-  base_personas_t1_t2 %>% filter( respboth_per == 1)
 temp <- base_personas_ambos %>%
@@ -187,7 +208,7 @@ temp_pobreza <- base_personas_ambos %>%
   pivot_wider(names_from = trimestre, values_from = pobreza) %>%
   rename(pobreza_t1 = 'T1', pobreza_t2 = 'T2')
 
-table(temp_pobreza$pobreza_t1, temp_pobreza$pobreza_t2)
+table(temp_pobreza$pobreza_t1, temp_pobreza$pobreza_t2, useNA = "a")
 
 temp  <- temp %>% mutate(estrato_pp = estrato) %>%
   fastDummies::dummy_columns(select_columns = "estrato_pp",
@@ -196,6 +217,7 @@ temp  <- temp %>% mutate(estrato_pp = estrato) %>%
               .cols = starts_with("estrato_pp"))
 
 base_personas_trim <- inner_join(temp, temp_pobreza, by = "id_llave") 
+
 
 # =============================================
 # 9. DISEÑO MUESTRAL COMPLEJO

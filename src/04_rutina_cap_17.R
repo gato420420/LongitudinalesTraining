@@ -56,11 +56,13 @@ base_personas_trim %>%
   mutate(pobreza_t1 = case_when(  
     pobreza_t1 == 1 ~ "Pobreza extrema",  
     pobreza_t1 == 2 ~ "Pobreza no extrema",  
-    pobreza_t1 == 3 ~ "Fuera de la pobreza"),  
+    pobreza_t1 == 3 ~ "Fuera de la pobreza", 
+    TRUE ~ "No responde"),  
     pobreza_t2 = case_when(  
       pobreza_t2 == 1 ~ "Pobreza extrema",  
       pobreza_t2 == 2 ~ "Pobreza no extrema",  
-      pobreza_t2 == 3 ~ "Fuera de la pobreza")) %>%
+      pobreza_t2 == 3 ~ "Fuera de la pobreza", 
+      TRUE ~ "No responde")) %>%
   pivot_wider(names_from = pobreza_t2, values_from = n, values_fill = 0)
 
 # 4.2 Estimación poblacional de transiciones
@@ -72,11 +74,13 @@ design_cali %>%
   mutate(pobreza_t1 = case_when(  
     pobreza_t1 == 1 ~ "Pobreza extrema",  
     pobreza_t1 == 2 ~ "Pobreza no extrema",  
-    pobreza_t1 == 3 ~ "Fuera de la pobreza"),  
+    pobreza_t1 == 3 ~ "Fuera de la pobreza",
+    TRUE ~ "No responde"),  
     pobreza_t2 = case_when(  
       pobreza_t2 == 1 ~ "Pobreza extrema",  
       pobreza_t2 == 2 ~ "Pobreza no extrema",  
-      pobreza_t2 == 3 ~ "Fuera de la pobreza")) %>%
+      pobreza_t2 == 3 ~ "Fuera de la pobreza", 
+      TRUE ~ "No responde")) %>%
   ungroup() %>%
   pivot_wider(names_from = pobreza_t2,  
               values_from = total, values_fill = "0 (0)")
@@ -91,11 +95,13 @@ design_cali <- design_cali %>%
     pobreza_t1 = factor(
       pobreza_t1,
       levels = c(1, 2, 3),
-      labels = c("Pobreza extrema", "Pobreza no extrema", "Fuera de la pobreza")),
+      labels = c("Pobreza extrema", "Pobreza no extrema",
+                 "Fuera de la pobreza")),
     pobreza_t2 = factor(
       pobreza_t2,
       levels = c(1, 2, 3),
-      labels = c("Pobreza extrema", "Pobreza no extrema", "Fuera de la pobreza"))
+      labels = c("Pobreza extrema", "Pobreza no extrema", 
+                 "Fuera de la pobreza"))
   )
 
 # 5.2 Ajustar Modelo C (transiciones dependen del estado inicial)
